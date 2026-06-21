@@ -30,6 +30,14 @@ def test_avaliar_status_solo_encharcado():
     assert resultado["status"] == "Encharcado"
     assert resultado["irrigar"] is False
 
+def test_calcular_eto_blaney_criddle():
+    calc = CalculadorIrrigacao()
+    # t_media = 25, mes_index = 1
+    # P for Jan is 25
+    # ETo = (0.457 * 25 + 8.13) * (25 / 100) = (11.425 + 8.13) * 0.25 = 19.555 * 0.25 = 4.88875 -> 4.89
+    eto = calc.calcular_eto_blaney_criddle(25, 1)
+    assert eto == 4.89
+
 def test_calcular_eto_hargreaves():
     calc = CalculadorIrrigacao()
     # ETo para Janeiro (mes_index = 1), Tmax=30, Tmin=20

@@ -8,6 +8,17 @@ class CalculadorIrrigacao:
         self.umidade_ideal_min = 60.0
         self.umidade_ideal_max = 80.0
 
+    def calcular_eto_blaney_criddle(self, t_media, mes_index):
+        """
+        Calcula a Evapotranspiração de Referência (ETo em mm/dia) usando o método de Blaney-Criddle-FAO.
+        """
+        # Percentagem diária de horas anuais de luz solar para a Latitude 20 Sul
+        p_dict = {1: 25, 2: 26, 3: 27, 4: 28, 5: 29, 6: 30, 7: 30, 8: 29, 9: 28, 10: 26, 11: 25, 12: 25}
+
+        p = p_dict.get(mes_index, 25)
+        eto = (0.457 * t_media + 8.13) * (p / 100)
+        return round(eto, 2)
+
     def calcular_eto_hargreaves(self, t_max, t_min, latitude, mes_index):
         """
         Calcula a Evapotranspiração de Referência (ETo em mm/dia) usando a equação
