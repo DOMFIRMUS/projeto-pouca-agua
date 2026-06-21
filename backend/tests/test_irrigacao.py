@@ -47,3 +47,14 @@ def test_calcular_irn_e_cad():
     cad, irn_max = calc.calcular_irn_e_cad(0.3, 0.15, 0.4, 0.5, 100)
     assert cad == 60.0
     assert irn_max == 30.0
+
+def test_calcular_turno_rega_max():
+    calc = CalculadorIrrigacao()
+    # irn_max_mm=13.0, etc_mm_dia=5.0, sp_m=0.5, sr_m=1.0
+    # TR_max = floor(13.0 / (5.0 * 0.5 * 1.0)) = floor(13.0 / 2.5) = floor(5.2) = 5
+    tr_max = calc.calcular_turno_rega_max(13.0, 5.0, 0.5, 1.0)
+    assert tr_max == 5
+
+    # Caso com valores zerados para etc_mm_dia, sp_m ou sr_m
+    tr_max_zero = calc.calcular_turno_rega_max(13.0, 0, 0.5, 1.0)
+    assert tr_max_zero == 0

@@ -46,6 +46,16 @@ class CalculadorIrrigacao:
         irn_max = cad * fator_f * fw
         return round(cad, 2), round(irn_max, 2)
 
+    def calcular_turno_rega_max(self, irn_max_mm, etc_mm_dia, sp_m, sr_m):
+        """
+        Calcula o Turno de Rega Máximo (TR_max) baseado na Equação 44 da tese.
+        """
+        if etc_mm_dia <= 0 or sp_m <= 0 or sr_m <= 0:
+            return 0
+
+        tr_max = math.floor(irn_max_mm / (etc_mm_dia * sp_m * sr_m))
+        return tr_max
+
     def avaliar_status_solo(self, valor_umidade):
         if valor_umidade < self.umidade_critica:
             return {"status": "Crítico (Seco)", "cor_alerta": "danger", "irrigar": True, "mensagem": "Solo excessivamente seco. Ligue a irrigação."}

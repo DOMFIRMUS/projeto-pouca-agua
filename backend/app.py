@@ -20,7 +20,9 @@ dados_sistema = {
     "solo_pmp": 0.14,               # Ponto de murcha permanente m³/m³
     "profundidade_raiz_m": 0.40,    # Raiz do cultivo atual (0.4 metros)
     "fator_deplecao_f": 0.50,       # Fator f da tabela 6 da tese
-    "porcentagem_umedecida_pw": 50.0 # Gotejamento cobre 50% da área
+    "porcentagem_umedecida_pw": 50.0, # Gotejamento cobre 50% da área
+    "espacamento_plantas_m": 0.5,   # Espaçamento entre plantas na fileira
+    "espacamento_fileiras_m": 1.0   # Espaçamento entre fileiras
 }
 
 @app.route('/api/status', methods=['GET'])
@@ -51,6 +53,15 @@ def obter_status():
         dados_sistema["porcentagem_umedecida_pw"]
     )
 
+    # Cálculo do Turno de Rega Máximo (TR_max)
+    # Assumindo etc_mm_dia aproximadamente igual a eto para simplificação (Kc = 1.0)
+    turno_rega_max_dias = calculador.calcular_turno_rega_max(
+        irn_max_mm=irn_max,
+        etc_mm_dia=eto,
+        sp_m=dados_sistema["espacamento_plantas_m"],
+        sr_m=dados_sistema["espacamento_fileiras_m"]
+    )
+
     # 2. Avalia situação atual do sensor
     analise = calculador.avaliar_status_solo(umidade_atual)
 
@@ -71,6 +82,7 @@ def obter_status():
         "cor_alerta": analise["cor_alerta"],
         "mensagem_acao": analise["mensagem"],
         "precisa_irrigar": analise["irrigar"],
+        "turno_rega_max_dias": turno_rega_max_dias,
         "metricas_tese": {
             "evapotranspiracao_referencia_mm_dia": eto,
             "capacidade_agua_disponivel_solo_mm": cad,
