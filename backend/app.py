@@ -3,17 +3,18 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from models.irrigacao import CalculadorIrrigacao
 import datetime
+from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico
 
 app = Flask(__name__)
 CORS(app)
 
 calculador = CalculadorIrrigacao()
 
-# Estado inicial simulando sensores de campo e dados do agricultor
+# Inicializa o banco de dados
+init_db()
+
+# Variáveis do sistema para cálculos
 dados_sistema = {
-    "ultima_umidade": 45.0,         # Solo atualmente em nível de atenção
-    "temperatura_max": 31.0,        # Clima local para cálculo de ETo
-    "temperatura_min": 19.0,
     "mes_atual": 10,                # Outubro (mês crítico de calor)
     "solo_cc": 0.27,                # Capacidade de campo m³/m³ (ex: solo argiloso)
     "solo_pmp": 0.14,               # Ponto de murcha permanente m³/m³
@@ -24,10 +25,20 @@ dados_sistema = {
 
 @app.route('/api/status', methods=['GET'])
 def obter_status():
+    ultima_leitura = get_ultima_leitura()
+
+    if not ultima_leitura:
+        return jsonify({"erro": "Nenhuma leitura encontrada no banco de dados."}), 404
+
+    temperatura_max = ultima_leitura['temperatura_max']
+    temperatura_min = ultima_leitura['temperatura_min']
+    umidade_atual = ultima_leitura['umidade']
+    leitura_id = ultima_leitura['id']
+
     # 1. Executa cálculos científicos baseados na Tese
     eto = calculador.calcular_eto_hargreaves(
-        dados_sistema["temperatura_max"],
-        dados_sistema["temperatura_min"],
+        temperatura_max,
+        temperatura_min,
         latitude=-22.0,
         mes_index=dados_sistema["mes_atual"]
     )
@@ -41,7 +52,6 @@ def obter_status():
     )
 
     # 2. Avalia situação atual do sensor
-    umidade_atual = dados_sistema["ultima_umidade"]
     analise = calculador.avaliar_status_solo(umidade_atual)
 
     # Cálculo dinâmico do tempo de rega baseado na lâmina necessária (IRN) e ETo
@@ -51,6 +61,9 @@ def obter_status():
         tempo_estimado_minutos = round((defice_proporcional * irn_max * 60) / max(eto, 1), 1)
     else:
         tempo_estimado_minutos = 0.0
+
+    # Atualiza o status e o tempo calculado no banco de dados
+    update_leitura_status(leitura_id, analise["status"], max(tempo_estimado_minutos, 0.0))
 
     return jsonify({
         "umidade_atual": umidade_atual,
@@ -72,13 +85,31 @@ def receber_dados_sensor():
     if not dados_recebidos or 'umidade' not in dados_recebidos:
         return jsonify({"erro": "O campo 'umidade' é obrigatório."}), 400
 
-    dados_sistema["ultima_umidade"] = float(dados_recebidos['umidade'])
-    if 'temperatura_max' in dados_recebidos:
-        dados_sistema["temperatura_max"] = float(dados_recebidos['temperatura_max'])
-    if 'temperatura_min' in dados_recebidos:
-        dados_sistema["temperatura_min"] = float(dados_recebidos['temperatura_min'])
+    umidade = float(dados_recebidos['umidade'])
 
-    return jsonify({"status": "sucesso", "mensagem": "Métricas de campo atualizadas."}), 200
+    # Obtém as temperaturas da última leitura se não forem enviadas
+    ultima_leitura = get_ultima_leitura()
+
+    temperatura_max = 31.0 # Valor padrão caso seja a primeira leitura
+    temperatura_min = 19.0 # Valor padrão caso seja a primeira leitura
+
+    if ultima_leitura:
+        temperatura_max = ultima_leitura['temperatura_max']
+        temperatura_min = ultima_leitura['temperatura_min']
+
+    if 'temperatura_max' in dados_recebidos:
+        temperatura_max = float(dados_recebidos['temperatura_max'])
+    if 'temperatura_min' in dados_recebidos:
+        temperatura_min = float(dados_recebidos['temperatura_min'])
+
+    insert_leitura(umidade, temperatura_max, temperatura_min)
+
+    return jsonify({"status": "sucesso", "mensagem": "Métricas de campo atualizadas e inseridas no banco de dados."}), 200
+
+@app.route('/api/historico', methods=['GET'])
+def obter_historico():
+    historico = get_historico()
+    return jsonify(historico), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
