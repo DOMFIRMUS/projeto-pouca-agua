@@ -55,6 +55,20 @@ class CalculadorIrrigacao:
 
         return self.tabela_ra[lat_par][mes_index - 1]
 
+    def calcular_pressao_atual_ea(self, es, umidade_relativa_media_ur):
+        """
+        Calcula a Pressão Atual de Vapor (ea) em kPa.
+        Equação 15 da Tese: ea = es * (UR_m / 100)
+        """
+        ea = es * (umidade_relativa_media_ur / 100.0)
+        return round(ea, 4)
+
+    def calcular_deficit_pressao_vapor(self, es, ea):
+        """
+        Calcula o Déficit de Pressão de Vapor (es - ea) em kPa.
+        """
+        return round(es - ea, 4)
+
     def calcular_eto_blaney_criddle(self, t_media, mes_index):
         """
         Calcula a Evapotranspiração de Referência (ETo em mm/dia) usando o método de Blaney-Criddle-FAO.
