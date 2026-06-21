@@ -56,6 +56,14 @@ def test_calcular_irn_e_cad():
     assert cad == 60.0
     assert irn_max == 30.0
 
+def test_calcular_itn():
+    calc = CalculadorIrrigacao()
+    # irn_mm = 30, ce_agua_ds_m = 1.0, ce_solo_min = 1.0, ce_solo_max = 2.0, uniformidade_emissao_decimal = 0.90
+    # FL = 1.0 / (2 * 2.0) = 0.25
+    # ITN = 30 / ((1 - 0.25) * 1.0 * 0.90) = 30 / (0.75 * 0.9) = 30 / 0.675 = 44.444...
+    fl, itn = calc.calcular_itn(30, 1.0, 1.0, 2.0, 0.90)
+    assert fl == 0.25
+    assert itn == 44.44
 def test_calcular_fator_obstrucao():
     calc = CalculadorIrrigacao()
 
@@ -114,3 +122,26 @@ def test_comprimento_trecho_a_trecho():
     )
     assert isinstance(comprimento, float)
     assert comprimento > 0.0
+
+def test_perda_conector_lateral():
+    calc = CalculadorIrrigacao()
+    # Valores de exemplo: diam=0.016, comp=0.05, vel_con=1.5, vel_lat=1.0
+    # hfl_l = 2.268121 * (0.016 ** 0.106) * (0.05 ** 1.057) * (1.5 ** 1.766) * (1.0 ** 0.386)
+    # 0.016**0.106 ~= 0.648
+    # 0.05**1.057 ~= 0.0426
+    # 1.5**1.766 ~= 2.046
+    # 1.0**0.386 = 1.0
+    # 2.268121 * 0.648 * 0.0426 * 2.046 ~= 0.126
+    perda = calc.perda_conector_lateral(0.016, 0.05, 1.5, 1.0)
+    assert isinstance(perda, float)
+    assert round(perda, 3) == 0.126
+
+def test_calcular_pressao_inicial_bomba():
+    calc = CalculadorIrrigacao()
+    # pressao_emissor = 10.0
+    # perda_tubulacao = 2.0
+    # hfl_l calculada acima = 0.126
+    # pressao_inicial = 10.0 + 2.0 + 0.126 = 12.126
+    pressao = calc.calcular_pressao_inicial_bomba(10.0, 2.0, 0.016, 0.05, 1.5, 1.0)
+    assert isinstance(pressao, float)
+    assert round(pressao, 3) == 12.126

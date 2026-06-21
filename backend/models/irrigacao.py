@@ -57,6 +57,27 @@ class CalculadorIrrigacao:
         irn_max = cad * fator_f * fw
         return round(cad, 2), round(irn_max, 2)
 
+    def calcular_itn(self, irn_mm, ce_agua_ds_m, ce_solo_min, ce_solo_max, uniformidade_emissao_decimal):
+        """
+        Calcula a Irrigação Total Necessária (ITN) e a Fração de Lixiviação (FL)
+        com base nas Equações 42 e 43 da tese.
+        """
+        # Equação 43: FL = CEa / (2 * CEes_max)
+        fl = ce_agua_ds_m / (2 * ce_solo_max)
+
+        # Limitar o FL a valores viáveis para evitar divisão por zero ou negativa na eq. 42
+        if fl >= 1.0:
+            fl = 0.99
+        elif fl < 0.0:
+            fl = 0.0
+
+        # Equação 42: ITN = IRN / ((1 - FL) * EAP * Ea)
+        # Assumindo EAP = 1.0 (Eficiência de Aplicação) e Ea = uniformidade_emissao_decimal
+        eap = 1.0
+        itn = irn_mm / ((1 - fl) * eap * uniformidade_emissao_decimal)
+
+        return round(fl, 4), round(itn, 2)
+
     def calcular_fator_obstrucao(self, tipo_emissor, area_tubo, area_emissor):
         """
         Calcula o Índice de Obstrução (IO) e retorna o fator de perda de carga localizada (KL).
@@ -138,3 +159,20 @@ class CalculadorIrrigacao:
             return {"status": "Ideal", "cor_alerta": "success", "irrigar": False, "mensagem": "Solo com umidade perfeita."}
         else:
             return {"status": "Encharcado", "cor_alerta": "info", "irrigar": False, "mensagem": "Solo muito úmido. Evite desperdiçar água."}
+
+    def perda_conector_lateral(self, diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms):
+        """
+        Calcula a Perda Localizada de Carga por conexão de entrada em MCA.
+        Equação 77 da Tese (modelo de Vilaça).
+        """
+        hfl_l = 2.268121 * (diametro_conector_m ** 0.106) * (comprimento_conector_m ** 1.057) * (vel_conector_ms ** 1.766) * (vel_lateral_ms ** 0.386)
+        return hfl_l
+
+    def calcular_pressao_inicial_bomba(self, pressao_emissor, perda_carga_tubulacao, diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms):
+        """
+        Método principal de perda de carga:
+        Calcula a pressão inicial necessária da bomba adicionando a perda de carga localizada (Hfl_l).
+        """
+        hfl_l = self.perda_conector_lateral(diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms)
+        pressao_inicial = pressao_emissor + perda_carga_tubulacao + hfl_l
+        return pressao_inicial
