@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projeto Pouca Água</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="header">
+        <h1>Projeto Pouca Água</h1>
+        <p>Gestão de Irrigação</p>
+    </header>
+
+    <main class="container">
+        <!-- Status Atual -->
+        <section class="card status-card" id="status-card">
+            <h2>Umidade do Solo</h2>
+            <div class="moisture-display">
+                <span id="current-moisture">--</span>%
+            </div>
+            <div class="status-alert" id="status-alert">
+                Status: <span id="current-status">Carregando...</span>
+            </div>
+            <div class="timestamp">
+                Última atualização: <span id="last-update">--</span>
+            </div>
+        </section>
+
+        <!-- Informações de Irrigação e Dados -->
+        <section class="card info-card">
+            <h2>Recomendação de Irrigação</h2>
+            <div class="irrigation-time">
+                <span id="irrigation-minutes">--</span>
+                <span class="unit">minutos</span>
+            </div>
+
+            <div class="thesis-data">
+                <h3>Dados de Referência</h3>
+                <ul>
+                    <li><strong>ETo:</strong> <span id="data-eto">--</span> mm/dia</li>
+                    <li><strong>CAD:</strong> <span id="data-cad">--</span> mm</li>
+                    <li><strong>IRN:</strong> <span id="data-irn">--</span> mm</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Histórico -->
+        <section class="card history-card">
+            <h2>Histórico de Leituras</h2>
+            <div class="history-list-container">
+                <ul id="history-list" class="history-list">
+                    <!-- Items serão injetados aqui via JavaScript -->
+                    <li>Carregando histórico...</li>
+                </ul>
+            </div>
+        </section>
+    </main>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
