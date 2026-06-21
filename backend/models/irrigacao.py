@@ -1,4 +1,3 @@
-# backend/models/irrigacao.py
 import math
 
 class CalculadorIrrigacao:
@@ -7,6 +6,17 @@ class CalculadorIrrigacao:
         self.umidade_critica = 40.0
         self.umidade_ideal_min = 60.0
         self.umidade_ideal_max = 80.0
+
+    def calcular_eto_blaney_criddle(self, t_media, mes_index):
+        """
+        Calcula a Evapotranspiração de Referência (ETo em mm/dia) usando o método de Blaney-Criddle-FAO.
+        """
+        # Percentagem diária de horas anuais de luz solar para a Latitude 20 Sul
+        p_dict = {1: 25, 2: 26, 3: 27, 4: 28, 5: 29, 6: 30, 7: 30, 8: 29, 9: 28, 10: 26, 11: 25, 12: 25}
+
+        p = p_dict.get(mes_index, 25)
+        eto = (0.457 * t_media + 8.13) * (p / 100)
+        return round(eto, 2)
 
     def calcular_eto_hargreaves(self, t_max, t_min, latitude, mes_index):
         """
@@ -45,6 +55,42 @@ class CalculadorIrrigacao:
         # Equação 40: IRN_max = CAD * f * Fw
         irn_max = cad * fator_f * fw
         return round(cad, 2), round(irn_max, 2)
+
+    def calcular_fator_obstrucao(self, tipo_emissor, area_tubo, area_emissor):
+        """
+        Calcula o Índice de Obstrução (IO) e retorna o fator de perda de carga localizada (KL).
+        """
+        if area_tubo <= 0:
+            return 0.0
+
+        io = area_emissor / area_tubo
+        tipo_emissor = tipo_emissor.lower()
+
+        if tipo_emissor == 'online':
+            kl = 1.935 * (io ** 0.595)
+        elif tipo_emissor == 'pastilha':
+            kl = 1.383 * (io ** 0.576)
+        elif tipo_emissor == 'bobi':
+            kl = 1.230 * (io ** 0.510)
+        else:
+            kl = 0.0
+
+        return round(kl, 4)
+
+    def calcular_perda_carga_total(self, f_tubo, comprimento, diametro, velocidade, tipo_emissor, area_tubo, area_emissor):
+        """
+        Calcula a perda de carga total da linha lateral (hf) adicionando o fator de obstrução (KL)
+        ao fator de atrito 'f' do tubo.
+        """
+        if diametro <= 0:
+            return 0.0
+
+        kl = self.calcular_fator_obstrucao(tipo_emissor, area_tubo, area_emissor)
+
+        # hf = (f + KL) * (L / D) * (V^2 / 2g)
+        hf = (f_tubo + kl) * (comprimento / diametro) * (velocidade ** 2) / (2 * 9.81)
+
+        return round(hf, 4)
 
     def calcular_turno_rega_max(self, irn_max_mm, etc_mm_dia, sp_m, sr_m):
         """
