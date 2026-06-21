@@ -446,6 +446,35 @@ class CalculadorIrrigacao:
         hfl_l = 2.268121 * (diametro_conector_m ** 0.106) * (comprimento_conector_m ** 1.057) * (vel_conector_ms ** 1.766) * (vel_lateral_ms ** 0.386)
         return hfl_l
 
+    def perda_conector_zitterell(self, die, dis, lc, dt, vt):
+        """
+        Calcula a perda localizada de carga em conectores de linhas laterais usando o modelo de Zitterell (2011).
+
+        Parâmetros:
+        die (float): Diâmetro interno de entrada do conector (mm)
+        dis (float): Diâmetro interno de saída do conector (mm)
+        lc (float): Comprimento do conector (mm)
+        dt (float): Diâmetro interno do tubo (mm)
+        vt (float): Velocidade média de escoamento no tubo (m/s)
+
+        Retorna:
+        tuple: (hfc, aviso) onde hfc é a perda de carga (mca) e aviso é uma string ou None.
+        """
+        aviso = None
+
+        # Limites do modelo
+        if not (2.318 <= die <= 7.900) or \
+           not (2.318 <= dis <= 12.006) or \
+           not (21.483 <= lc <= 65.046) or \
+           not (4.050 <= dt <= 12.854) or \
+           not (0.363 <= vt <= 7.580):
+            aviso = "Aviso de precisão reduzida"
+
+        # Equação 72: Hf_c = 0.000141 * D_{ie}^{-5.739} * D_{is}^{2.156} * L_c^{0.925} * D_t^{1.756} * V_t^{1.971}
+        hfc = 0.000141 * (die ** -5.739) * (dis ** 2.156) * (lc ** 0.925) * (dt ** 1.756) * (vt ** 1.971)
+
+        return hfc, aviso
+
     def calcular_pressao_inicial_bomba(self, pressao_emissor, perda_carga_tubulacao, diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms):
         """
         Método principal de perda de carga:

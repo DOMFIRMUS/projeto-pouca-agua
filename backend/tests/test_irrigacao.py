@@ -385,3 +385,36 @@ def test_calcular_pressao_inicial_bomba():
     pressao = calc.calcular_pressao_inicial_bomba(10.0, 2.0, 0.016, 0.05, 1.5, 1.0)
     assert isinstance(pressao, float)
     assert round(pressao, 3) == 12.126
+
+def test_perda_conector_zitterell():
+    calc = CalculadorIrrigacao()
+
+    # Valores dentro dos limites:
+    # die=4.0, dis=5.0, lc=30.0, dt=8.0, vt=1.0
+    # Equação 72: Hf_c = 0.000141 * 4.0^-5.739 * 5.0^2.156 * 30.0^0.925 * 8.0^1.756 * 1.0^1.971
+    hfc, aviso = calc.perda_conector_zitterell(4.0, 5.0, 30.0, 8.0, 1.0)
+    assert aviso is None
+    assert isinstance(hfc, float)
+    # Expected calculate: 0.000141 * (4.0 ** -5.739) * (5.0 ** 2.156) * (30.0 ** 0.925) * (8.0 ** 1.756) * (1.0 ** 1.971) = ~0.001422785
+    expected = 0.000141 * (4.0 ** -5.739) * (5.0 ** 2.156) * (30.0 ** 0.925) * (8.0 ** 1.756) * (1.0 ** 1.971)
+    assert round(hfc, 6) == round(expected, 6)
+
+    # Teste de limites: Valor fora para Die (menor que 2.318)
+    hfc, aviso = calc.perda_conector_zitterell(2.0, 5.0, 30.0, 8.0, 1.0)
+    assert aviso == "Aviso de precisão reduzida"
+
+    # Teste de limites: Valor fora para Dis (maior que 12.006)
+    hfc, aviso = calc.perda_conector_zitterell(4.0, 13.0, 30.0, 8.0, 1.0)
+    assert aviso == "Aviso de precisão reduzida"
+
+    # Teste de limites: Valor fora para Lc (menor que 21.483)
+    hfc, aviso = calc.perda_conector_zitterell(4.0, 5.0, 20.0, 8.0, 1.0)
+    assert aviso == "Aviso de precisão reduzida"
+
+    # Teste de limites: Valor fora para Dt (maior que 12.854)
+    hfc, aviso = calc.perda_conector_zitterell(4.0, 5.0, 30.0, 15.0, 1.0)
+    assert aviso == "Aviso de precisão reduzida"
+
+    # Teste de limites: Valor fora para Vt (menor que 0.363)
+    hfc, aviso = calc.perda_conector_zitterell(4.0, 5.0, 30.0, 8.0, 0.2)
+    assert aviso == "Aviso de precisão reduzida"
