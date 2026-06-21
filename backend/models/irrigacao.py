@@ -102,3 +102,30 @@ class CalculadorIrrigacao:
             return {"status": "Ideal", "cor_alerta": "success", "irrigar": False, "mensagem": "Solo com umidade perfeita."}
         else:
             return {"status": "Encharcado", "cor_alerta": "info", "irrigar": False, "mensagem": "Solo muito úmido. Evite desperdiçar água."}
+
+    def calcular_area_sombreada(self, tipo_copa, espacamento_plantas_sp, espacamento_fileiras_sr, largura_faixa_ss=None, diametro_copa_dco=None):
+        """
+        Calcula a Porcentagem de Área Sombreada (Ps).
+        """
+        if espacamento_fileiras_sr <= 0:
+            return 0.0
+
+        tipo_copa = tipo_copa.lower()
+
+        if tipo_copa == 'faixa_continua':
+            if largura_faixa_ss is None:
+                return 0.0
+            # Equação 28: Ps = (largura_faixa_ss / espacamento_fileiras_sr) * 100
+            ps = (largura_faixa_ss / espacamento_fileiras_sr) * 100
+            return round(ps, 2)
+
+        elif tipo_copa == 'arvore_isolada':
+            if diametro_copa_dco is None or espacamento_plantas_sp <= 0:
+                return 0.0
+            # Equação 29: Ps = ((math.pi * (diametro_copa_dco ** 2) / 4) / (espacamento_fileiras_sr * espacamento_plantas_sp)) * 100
+            area_copa = (math.pi * (diametro_copa_dco ** 2)) / 4
+            area_plantio = espacamento_fileiras_sr * espacamento_plantas_sp
+            ps = (area_copa / area_plantio) * 100
+            return round(ps, 2)
+
+        return 0.0
