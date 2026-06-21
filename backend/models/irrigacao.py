@@ -1,4 +1,5 @@
 import math
+import datetime
 
 class CalculadorIrrigacao:
     def __init__(self):
@@ -280,6 +281,22 @@ class CalculadorIrrigacao:
         else:
             return {"status": "Encharcado", "cor_alerta": "info", "irrigar": False, "mensagem": "Solo muito úmido. Evite desperdiçar água."}
 
+    def obter_kc_atual(self, data_plantio, dias_fases, kc_valores):
+        """
+        Calcula o Coeficiente de Cultura (Kc) atual baseado na idade da planta.
+        """
+        if isinstance(data_plantio, str):
+            data_plantio = datetime.datetime.strptime(data_plantio, "%Y-%m-%d").date()
+
+        hoje = datetime.date.today()
+        idade_dias = (hoje - data_plantio).days
+
+        if idade_dias < dias_fases['inicial']:
+            return kc_valores['inicial']
+        elif idade_dias <= dias_fases['inicial'] + dias_fases['meia_estacao']:
+            return kc_valores['media']
+        else:
+            return kc_valores['final']
     def dimensionar_diametro_trecho(self, fator_atrito_f, vazao_trecho_q, desnivel_trecho_dz, comprimento_trecho_L, h0=0.0):
         """
         Dimensiona a linha de derivação trecho a trecho.

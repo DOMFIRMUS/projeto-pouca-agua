@@ -28,7 +28,11 @@ def init_db():
             nome TEXT,
             kc_inicial REAL,
             kc_media REAL,
-            kc_final REAL
+            kc_final REAL,
+            data_plantio TEXT,
+            dias_fase_inicial INTEGER,
+            dias_meia_estacao INTEGER,
+            dias_fase_final INTEGER
         )
     ''')
     conn.commit()
@@ -43,16 +47,16 @@ def seed_culturas():
 
     if count == 0:
         culturas = [
-            ('Tomate tutorado', 0.60, 1.20, 0.90),
-            ('Alface', 0.70, 1.00, 0.95),
-            ('Batata', 0.50, 1.15, 0.75),
-            ('Cebola seca', 0.70, 1.05, 0.75),
-            ('Milho', 0.30, 1.20, 0.35),
-            ('Melancia', 0.40, 1.00, 0.75)
+            ('Tomate tutorado', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30),
+            ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15),
+            ('Batata', 0.50, 1.15, 0.75, '2023-08-20', 25, 30, 30),
+            ('Cebola seca', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20),
+            ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30),
+            ('Melancia', 0.40, 1.00, 0.75, '2023-09-05', 20, 30, 20)
         ]
         cursor.executemany('''
-            INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', culturas)
         conn.commit()
 
@@ -61,7 +65,7 @@ def seed_culturas():
 def get_culturas():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT id, nome, kc_inicial, kc_media, kc_final FROM culturas ORDER BY nome')
+    cursor.execute('SELECT id, nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final FROM culturas ORDER BY nome')
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]

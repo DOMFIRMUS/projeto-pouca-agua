@@ -45,6 +45,24 @@ def obter_status():
     umidade_atual = ultima_leitura['umidade']
     leitura_id = ultima_leitura['id']
 
+    culturas = get_culturas()
+    kc_atual = 1.0 # Default fallback
+    if culturas:
+        cultura_ativa = culturas[0]
+        kc_atual = calculador.obter_kc_atual(
+            data_plantio=cultura_ativa['data_plantio'],
+            dias_fases={
+                'inicial': cultura_ativa['dias_fase_inicial'],
+                'meia_estacao': cultura_ativa['dias_meia_estacao'],
+                'final': cultura_ativa['dias_fase_final']
+            },
+            kc_valores={
+                'inicial': cultura_ativa['kc_inicial'],
+                'media': cultura_ativa['kc_media'],
+                'final': cultura_ativa['kc_final']
+            }
+        )
+
     # 1. Executa cálculos científicos baseados na Tese
     metodo_eto = request.args.get('metodo_eto', 'hargreaves')
     t_media = (temperatura_max + temperatura_min) / 2
@@ -127,6 +145,7 @@ def obter_status():
         "cor_alerta": analise["cor_alerta"],
         "mensagem_acao": analise["mensagem"],
         "precisa_irrigar": analise["irrigar"],
+        "kc_atual": kc_atual,
         "agenda_rega": agenda_rega,
         "turno_rega_max_dias": turno_rega_max_dias,
         "lamina_bruta_irrigacao_mm": itn,
