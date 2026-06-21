@@ -57,6 +57,42 @@ class CalculadorIrrigacao:
         irn_max = cad * fator_f * fw
         return round(cad, 2), round(irn_max, 2)
 
+    def calcular_fator_obstrucao(self, tipo_emissor, area_tubo, area_emissor):
+        """
+        Calcula o Índice de Obstrução (IO) e retorna o fator de perda de carga localizada (KL).
+        """
+        if area_tubo <= 0:
+            return 0.0
+
+        io = area_emissor / area_tubo
+        tipo_emissor = tipo_emissor.lower()
+
+        if tipo_emissor == 'online':
+            kl = 1.935 * (io ** 0.595)
+        elif tipo_emissor == 'pastilha':
+            kl = 1.383 * (io ** 0.576)
+        elif tipo_emissor == 'bobi':
+            kl = 1.230 * (io ** 0.510)
+        else:
+            kl = 0.0
+
+        return round(kl, 4)
+
+    def calcular_perda_carga_total(self, f_tubo, comprimento, diametro, velocidade, tipo_emissor, area_tubo, area_emissor):
+        """
+        Calcula a perda de carga total da linha lateral (hf) adicionando o fator de obstrução (KL)
+        ao fator de atrito 'f' do tubo.
+        """
+        if diametro <= 0:
+            return 0.0
+
+        kl = self.calcular_fator_obstrucao(tipo_emissor, area_tubo, area_emissor)
+
+        # hf = (f + KL) * (L / D) * (V^2 / 2g)
+        hf = (f_tubo + kl) * (comprimento / diametro) * (velocidade ** 2) / (2 * 9.81)
+
+        return round(hf, 4)
+
     def avaliar_status_solo(self, valor_umidade):
         if valor_umidade < self.umidade_critica:
             return {"status": "Crítico (Seco)", "cor_alerta": "danger", "irrigar": True, "mensagem": "Solo excessivamente seco. Ligue a irrigação."}
