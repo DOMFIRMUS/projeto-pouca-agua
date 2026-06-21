@@ -56,6 +56,29 @@ def test_calcular_irn_e_cad():
     assert cad == 60.0
     assert irn_max == 30.0
 
+def test_calcular_kl():
+    calc = CalculadorIrrigacao()
+    # Test Keller
+    assert calc.calcular_kl('Keller', 0.5) == round(0.5 + 0.15 * (1 - 0.5), 2)
+    # Test Bernardo
+    assert calc.calcular_kl('Bernardo', 0.5) == 0.5
+    # Test Fereres
+    assert calc.calcular_kl('Fereres', 0.70) == 1.0
+    assert calc.calcular_kl('Fereres', 0.50) == round((1.09 * 0.50) + 0.30, 2)
+    assert calc.calcular_kl('Fereres', 0.15) == round((1.94 * 0.15) + 0.10, 2)
+    # Test Keller_Bliesner
+    assert calc.calcular_kl('Keller_Bliesner', 0.25) == round(0.10 * 5.0, 2)  # sqrt(25) = 5
+    # Test Fallback
+    assert calc.calcular_kl('Desconhecido', 0.5) == 1.0
+
+def test_calcular_etc():
+    calc = CalculadorIrrigacao()
+    # etc = eto * kc * kl
+    # 5.0 * 1.2 * 0.8 = 4.8
+    assert calc.calcular_etc(5.0, 1.2, 0.8) == 4.8
+    # Com KL padrão de 1.0
+    # 4.0 * 1.1 * 1.0 = 4.4
+    assert calc.calcular_etc(4.0, 1.1) == 4.4
 def test_classificar_perfil_pressao():
     calc = CalculadorIrrigacao()
 
