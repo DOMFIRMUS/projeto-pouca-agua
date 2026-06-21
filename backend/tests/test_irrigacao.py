@@ -385,3 +385,20 @@ def test_calcular_pressao_inicial_bomba():
     pressao = calc.calcular_pressao_inicial_bomba(10.0, 2.0, 0.016, 0.05, 1.5, 1.0)
     assert isinstance(pressao, float)
     assert round(pressao, 3) == 12.126
+
+def test_calcular_constante_psicrometrica():
+    calc = CalculadorIrrigacao()
+
+    # Test with altitude_z = 0
+    # P = 101.3 * (((293 - 0) / 293) ** 5.26) = 101.3
+    # gamma = 0.665 * 10^-3 * 101.3 = 0.0673645
+    p_kpa, gamma = calc.calcular_constante_psicrometrica(0)
+    assert p_kpa == 101.30
+    assert gamma == 0.067364
+
+    # Test with altitude_z = 1000
+    # P = 101.3 * (((293 - 6.5) / 293) ** 5.26) ~= 90.02
+    # gamma = 0.665 * 10^-3 * P ~= 0.059866
+    p_kpa_1000, gamma_1000 = calc.calcular_constante_psicrometrica(1000)
+    assert p_kpa_1000 == 90.02
+    assert gamma_1000 == 0.059866
