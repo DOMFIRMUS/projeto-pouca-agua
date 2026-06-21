@@ -100,3 +100,26 @@ def test_calcular_perda_carga_total():
     # Test D = 0
     hf_zero = calc.calcular_perda_carga_total(0.02, 100, 0.0, 1.5, 'online', 200, 20)
     assert hf_zero == 0.0
+
+def test_obter_kc_atual():
+    calc = CalculadorIrrigacao()
+    import datetime
+
+    # Mock parameters
+    data_plantio = datetime.date.today() - datetime.timedelta(days=25)
+    dias_fases = {'inicial': 20, 'meia_estacao': 30, 'final': 20}
+    kc_valores = {'inicial': 0.5, 'media': 1.0, 'final': 0.8}
+
+    # Test age = 25, which is >= 20 and <= 20+30 (50) -> should be media
+    kc = calc.obter_kc_atual(data_plantio, dias_fases, kc_valores)
+    assert kc == 1.0
+
+    # Test age = 10 (inicial)
+    data_plantio_ini = datetime.date.today() - datetime.timedelta(days=10)
+    kc_ini = calc.obter_kc_atual(data_plantio_ini, dias_fases, kc_valores)
+    assert kc_ini == 0.5
+
+    # Test age = 60 (final)
+    data_plantio_fin = datetime.date.today() - datetime.timedelta(days=60)
+    kc_fin = calc.obter_kc_atual(data_plantio_fin, dias_fases, kc_valores)
+    assert kc_fin == 0.8
