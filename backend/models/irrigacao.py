@@ -281,6 +281,47 @@ class CalculadorIrrigacao:
         else:
             return {"status": "Encharcado", "cor_alerta": "info", "irrigar": False, "mensagem": "Solo muito úmido. Evite desperdiçar água."}
 
+    def calcular_perda_carga(self, diametro_mm, vazao_gotejador_lh, espacamento_m, comprimento_m):
+        """
+        Calcula a perda de carga em uma linha lateral de gotejamento usando a equação
+        empírica para tubos plásticos pequenos (Flamant/Blasius) e aplica o fator de Christiansen.
+        """
+        if espacamento_m <= 0:
+            return {"erro": "Espaçamento deve ser maior que zero"}
+
+        n_emissores = int(comprimento_m / espacamento_m)
+        if n_emissores == 0:
+            return {"erro": "O comprimento deve ser maior ou igual ao espaçamento"}
+
+        vazao_total_lh = n_emissores * vazao_gotejador_lh
+
+        # Vazão em m³/s e Diâmetro em m para a fórmula de perda de carga
+        q_m3s = (vazao_total_lh / 1000.0) / 3600.0
+        d_m = diametro_mm / 1000.0
+
+        if d_m <= 0:
+             return {"erro": "Diâmetro deve ser maior que zero"}
+
+        # Equação de Flamant/Blasius para plásticos pequenos: m = 1.75
+        m = 1.75
+
+        # Equação empírica de perda de carga para tubo contínuo (hf)
+        # J = 0.000859 * Q^1.75 * D^-4.75
+        hf_continua = 0.000859 * comprimento_m * (q_m3s ** 1.75) * (d_m ** -4.75)
+
+        # Fator de Christiansen para múltiplas saídas
+        fator_f = (1 / (m + 1)) + (1 / (2 * n_emissores)) + (math.sqrt(m - 1) / (6 * n_emissores**2))
+
+        # Perda de carga real
+        hf_mca = hf_continua * fator_f
+
+        status = "Aceitável" if hf_mca <= 2.0 else "Desuniformidade Elevada"
+
+        return {
+            "vazao_total_lh": round(vazao_total_lh, 2),
+            "perda_carga_mca": round(hf_mca, 3),
+            "status": status
+        }
     def obter_kc_atual(self, data_plantio, dias_fases, kc_valores):
         """
         Calcula o Coeficiente de Cultura (Kc) atual baseado na idade da planta.

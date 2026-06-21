@@ -65,6 +65,21 @@ def test_calcular_irn_e_cad():
     assert cad == 60.0
     assert irn_max == 30.0
 
+def test_calcular_perda_carga():
+    calc = CalculadorIrrigacao()
+    # Test valid input
+    resultado = calc.calcular_perda_carga(16, 2, 0.5, 50)
+    assert resultado["vazao_total_lh"] == 200.0
+    assert "perda_carga_mca" in resultado
+    assert resultado["status"] in ["Aceitável", "Desuniformidade Elevada"]
+
+    # Test invalid input (espacamento <= 0)
+    resultado_erro1 = calc.calcular_perda_carga(16, 2, 0, 50)
+    assert "erro" in resultado_erro1
+
+    # Test invalid input (diametro <= 0)
+    resultado_erro2 = calc.calcular_perda_carga(0, 2, 0.5, 50)
+    assert "erro" in resultado_erro2
     # Com etc_calculada = 3.0: f_corrigido = 0.58
     # irn_max = 60 * 0.58 * 1.0 = 34.8
     cad_corr, irn_max_corr = calc.calcular_irn_e_cad(0.3, 0.15, 0.4, 0.5, 100, etc_calculada=3.0)

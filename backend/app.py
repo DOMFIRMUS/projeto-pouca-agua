@@ -195,6 +195,38 @@ def obter_historico():
     historico = get_historico()
     return jsonify(historico), 200
 
+@app.route('/api/hidraulica', methods=['POST'])
+def hidraulica():
+    dados = request.get_json()
+
+    if not dados:
+        return jsonify({"erro": "Nenhum dado enviado"}), 400
+
+    campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
+
+    for campo in campos_obrigatorios:
+        if campo not in dados:
+            return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
+
+    try:
+        diametro_mm = float(dados['diametro_mm'])
+        vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
+        espacamento_m = float(dados['espacamento_m'])
+        comprimento_m = float(dados['comprimento_m'])
+    except ValueError:
+        return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
+
+    resultado = calculador.calcular_perda_carga(
+        diametro_mm,
+        vazao_gotejador_lh,
+        espacamento_m,
+        comprimento_m
+    )
+
+    if "erro" in resultado:
+        return jsonify(resultado), 400
+
+    return jsonify(resultado), 200
 @app.route('/api/culturas', methods=['GET'])
 def obter_culturas():
     culturas = get_culturas()
