@@ -45,6 +45,10 @@ def test_status_get(client):
     data = json.loads(response.data)
     assert data['umidade_atual'] == 40.0
     assert 'status_solo' in data
+    assert 'lamina_bruta_irrigacao_mm' in data
+    assert 'metricas_tese' in data
+    assert 'fracao_lixiviacao' in data['metricas_tese']
+    assert 'irrigacao_total_necessaria_mm' in data['metricas_tese']
 
 def test_historico_get(client):
     client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})

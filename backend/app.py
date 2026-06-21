@@ -20,7 +20,10 @@ dados_sistema = {
     "solo_pmp": 0.14,               # Ponto de murcha permanente m³/m³
     "profundidade_raiz_m": 0.40,    # Raiz do cultivo atual (0.4 metros)
     "fator_deplecao_f": 0.50,       # Fator f da tabela 6 da tese
-    "porcentagem_umedecida_pw": 50.0 # Gotejamento cobre 50% da área
+    "porcentagem_umedecida_pw": 50.0, # Gotejamento cobre 50% da área
+    "ce_solo_min": 1.0,             # Condutividade elétrica mínima do solo suportada (dS/m) - padrão
+    "ce_solo_max": 3.0,             # Condutividade elétrica máxima tolerada pela cultura (dS/m)
+    "uniformidade_emissao_decimal": 0.90 # Uniformidade de emissão do gotejador (90%)
 }
 
 @app.route('/api/status', methods=['GET'])
@@ -51,14 +54,25 @@ def obter_status():
         dados_sistema["porcentagem_umedecida_pw"]
     )
 
+    # Verifica se foi enviada a condutividade elétrica da água via query params
+    ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
+
+    fl, itn = calculador.calcular_itn(
+        irn_max,
+        ce_agua_ds_m,
+        dados_sistema["ce_solo_min"],
+        dados_sistema["ce_solo_max"],
+        dados_sistema["uniformidade_emissao_decimal"]
+    )
+
     # 2. Avalia situação atual do sensor
     analise = calculador.avaliar_status_solo(umidade_atual)
 
     # Cálculo dinâmico do tempo de rega baseado na lâmina necessária (IRN) e ETo
     if analise["irrigar"]:
-        # Se precisa irrigar, estima lâmina proporcional ao défice atual
+        # Se precisa irrigar, estima lâmina proporcional ao défice atual usando o ITN ao invés do irn_max
         defice_proporcional = (dados_sistema["solo_cc"] - (umidade_atual/100 * dados_sistema["solo_cc"]))
-        tempo_estimado_minutos = round((defice_proporcional * irn_max * 60) / max(eto, 1), 1)
+        tempo_estimado_minutos = round((defice_proporcional * itn * 60) / max(eto, 1), 1)
     else:
         tempo_estimado_minutos = 0.0
 
@@ -71,10 +85,13 @@ def obter_status():
         "cor_alerta": analise["cor_alerta"],
         "mensagem_acao": analise["mensagem"],
         "precisa_irrigar": analise["irrigar"],
+        "lamina_bruta_irrigacao_mm": itn,
         "metricas_tese": {
             "evapotranspiracao_referencia_mm_dia": eto,
             "capacidade_agua_disponivel_solo_mm": cad,
             "irrigacao_real_necessaria_max_mm": irn_max,
+            "fracao_lixiviacao": fl,
+            "irrigacao_total_necessaria_mm": itn,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0)
         }
     }), 200
