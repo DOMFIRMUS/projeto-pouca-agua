@@ -160,6 +160,27 @@ class CalculadorIrrigacao:
         else:
             return {"status": "Encharcado", "cor_alerta": "info", "irrigar": False, "mensagem": "Solo muito úmido. Evite desperdiçar água."}
 
+    def classificar_perfil_pressao(self, So, k_linha, L_estimado):
+        """
+        Classifica o perfil de pressão hidráulica baseado na tese.
+        So: declividade em decimal
+        k_linha: constante da linha
+        L_estimado: comprimento estimado
+        """
+        if So <= 0:
+            return 'Perfil Tipo I (Aclive ou Nível)'
+
+        J = k_linha * (L_estimado ** 1.75)
+        razao = So / J
+
+        if 0 < razao < 1:
+            return 'Perfil Tipo IIa (Declive Fraco)'
+        elif razao == 1:
+            return 'Perfil Tipo IIb (Declive Moderado)'
+        elif 1 < razao < 2.75:
+            return 'Perfil Tipo IIc (Declive Forte)'
+        else:
+            return 'Perfil Tipo IId (Declive Muito Forte)'
     def perda_conector_lateral(self, diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms):
         """
         Calcula a Perda Localizada de Carga por conexão de entrada em MCA.
