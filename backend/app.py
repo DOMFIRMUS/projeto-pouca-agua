@@ -72,8 +72,14 @@ def obter_status():
     else:
         tempo_estimado_minutos = 0.0
 
+    tempo_irrigacao_calculado_minutos = max(tempo_estimado_minutos, 0.0)
+
+    # Fracionamento do tempo de irrigação
+    tempo_irrigacao_horas = tempo_irrigacao_calculado_minutos / 60.0
+    agenda_rega = calculador.fracionar_tempo_irrigacao(tempo_irrigacao_horas)
+
     # Atualiza o status e o tempo calculado no banco de dados
-    update_leitura_status(leitura_id, analise["status"], max(tempo_estimado_minutos, 0.0))
+    update_leitura_status(leitura_id, analise["status"], tempo_irrigacao_calculado_minutos)
 
     return jsonify({
         "umidade_atual": umidade_atual,
@@ -81,11 +87,12 @@ def obter_status():
         "cor_alerta": analise["cor_alerta"],
         "mensagem_acao": analise["mensagem"],
         "precisa_irrigar": analise["irrigar"],
+        "agenda_rega": agenda_rega,
         "metricas_tese": {
             "evapotranspiracao_referencia_mm_dia": eto,
             "capacidade_agua_disponivel_solo_mm": cad,
             "irrigacao_real_necessaria_max_mm": irn_max,
-            "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0)
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos
         }
     }), 200
 

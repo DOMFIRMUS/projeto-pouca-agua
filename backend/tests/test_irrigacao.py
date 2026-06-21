@@ -100,3 +100,23 @@ def test_calcular_perda_carga_total():
     # Test D = 0
     hf_zero = calc.calcular_perda_carga_total(0.02, 100, 0.0, 1.5, 'online', 200, 20)
     assert hf_zero == 0.0
+
+def test_fracionar_tempo_irrigacao():
+    calc = CalculadorIrrigacao()
+    # Test with typical value
+    resultado1 = calc.fracionar_tempo_irrigacao(3.5, 2.0)
+    assert resultado1['tempo_total_horas'] == 3.5
+    assert resultado1['numero_ciclos'] == 2
+    assert resultado1['horas_por_ciclo'] == 1.75
+    assert resultado1['tempo_descanso_recomendado_horas'] == 1.0
+
+    # Test exact boundary
+    resultado2 = calc.fracionar_tempo_irrigacao(2.0, 2.0)
+    assert resultado2['tempo_total_horas'] == 2.0
+    assert resultado2['numero_ciclos'] == 1
+    assert resultado2['horas_por_ciclo'] == 2.0
+
+    # Test zero
+    resultado3 = calc.fracionar_tempo_irrigacao(0.0)
+    assert resultado3['tempo_total_horas'] == 0.0
+    assert resultado3['numero_ciclos'] == 0

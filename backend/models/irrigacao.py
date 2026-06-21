@@ -102,3 +102,26 @@ class CalculadorIrrigacao:
             return {"status": "Ideal", "cor_alerta": "success", "irrigar": False, "mensagem": "Solo com umidade perfeita."}
         else:
             return {"status": "Encharcado", "cor_alerta": "info", "irrigar": False, "mensagem": "Solo muito úmido. Evite desperdiçar água."}
+
+    def fracionar_tempo_irrigacao(self, ti_total_horas, tempo_maximo_bomba_horas=2.0):
+        """
+        Fraciona o tempo total de irrigação para proteger a bomba de água de operar
+        continuamente por mais tempo que o seu limite seguro.
+        """
+        if ti_total_horas <= 0:
+            return {
+                "tempo_total_horas": 0.0,
+                "numero_ciclos": 0,
+                "horas_por_ciclo": 0.0,
+                "tempo_descanso_recomendado_horas": 1.0
+            }
+
+        numero_ciclos = math.ceil(ti_total_horas / tempo_maximo_bomba_horas)
+        horas_por_ciclo = round(ti_total_horas / numero_ciclos, 2)
+
+        return {
+            "tempo_total_horas": round(ti_total_horas, 2),
+            "numero_ciclos": numero_ciclos,
+            "horas_por_ciclo": horas_por_ciclo,
+            "tempo_descanso_recomendado_horas": 1.0
+        }
