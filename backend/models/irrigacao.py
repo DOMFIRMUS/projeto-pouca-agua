@@ -142,6 +142,16 @@ class CalculadorIrrigacao:
 
         return round(hf, 4)
 
+    def perda_direta_derivacao(self, vel_derivacao_vd, diametro_derivacao_dd, area_protrusao_ap):
+        """
+        Calcula a Perda Localizada de Carga por Passagem Direta em conectores (Modelo de Vilaça, Eq 76).
+        Retorna o valor em m.c.a.
+        """
+        if diametro_derivacao_dd <= 0:
+            return 0.0
+
+        hfl_d = 0.043695 * (vel_derivacao_vd ** 1.897) * (diametro_derivacao_dd ** -2.428) * (area_protrusao_ap ** 1.109)
+        return round(hfl_d, 4)
     def calcular_turno_rega_max(self, irn_max_mm, etc_mm_dia, sp_m, sr_m):
         """
         Calcula o Turno de Rega Máximo (TR_max) baseado na Equação 44 da tese.
