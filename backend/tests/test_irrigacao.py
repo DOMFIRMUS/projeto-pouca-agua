@@ -108,6 +108,20 @@ def test_calcular_perda_carga_total():
     # Test D = 0
     hf_zero = calc.calcular_perda_carga_total(0.02, 100, 0.0, 1.5, 'online', 200, 20)
     assert hf_zero == 0.0
+def test_comprimento_trecho_a_trecho():
+    calc = CalculadorIrrigacao()
+    # Parâmetros de teste: diametro_m=0.016, vazao_emissor_m3s=5.5e-7 (aprox 2L/h)
+    # espacamento_m=0.3, pressao_entrada=10, declividade=0, hvar_max=2
+    comprimento = calc.comprimento_trecho_a_trecho(
+        diametro_m=0.016,
+        vazao_emissor_m3s=5.5e-7,
+        espacamento_m=0.3,
+        pressao_entrada_mca=10.0,
+        declividade=0.0,
+        hvar_max=2.0
+    )
+    assert isinstance(comprimento, float)
+    assert comprimento > 0.0
 
 def test_perda_conector_lateral():
     calc = CalculadorIrrigacao()
