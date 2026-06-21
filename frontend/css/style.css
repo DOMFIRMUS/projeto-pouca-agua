@@ -1,0 +1,222 @@
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+:root {
+    --bg-color: #f4f7f6;
+    --text-color: #333333;
+    --card-bg: #ffffff;
+    --header-bg: #005f73;
+    --header-text: #ffffff;
+
+    /* Alert Colors */
+    --color-ideal: #2a9d8f;      /* Green */
+    --color-moderate: #e9c46a;   /* Yellow */
+    --color-critical: #e76f51;   /* Red */
+    --color-unknown: #a8a8a8;    /* Gray */
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    font-size: 16px;
+    padding-bottom: 2rem;
+}
+
+/* Header */
+.header {
+    background-color: var(--header-bg);
+    color: var(--header-text);
+    text-align: center;
+    padding: 1.5rem 1rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.header h1 {
+    font-size: 2rem;
+    margin-bottom: 0.25rem;
+    font-weight: 700;
+}
+
+.header p {
+    font-size: 1.1rem;
+    opacity: 0.9;
+}
+
+/* Container & Grid */
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 0 1rem;
+    max-width: 600px;
+    margin: 0 auto; /* Center on larger screens */
+}
+
+/* Cards */
+.card {
+    background-color: var(--card-bg);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    border: 1px solid #e0e0e0;
+}
+
+.card h2 {
+    font-size: 1.4rem;
+    margin-bottom: 1rem;
+    text-align: center;
+    color: #264653;
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 0.5rem;
+}
+
+/* Status Card */
+.status-card {
+    text-align: center;
+    border-top: 8px solid var(--color-unknown); /* Default, updated by JS */
+}
+
+.moisture-display {
+    font-size: 4.5rem;
+    font-weight: 800;
+    line-height: 1;
+    margin: 1rem 0;
+    color: #264653;
+}
+
+.status-alert {
+    font-size: 1.3rem;
+    font-weight: 600;
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    background-color: #f0f0f0; /* Default, updated by JS */
+}
+
+.timestamp {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+/* Status Classes applied by JS */
+.status-ideal {
+    border-top-color: var(--color-ideal);
+}
+.status-ideal .status-alert {
+    background-color: #e6f7f5;
+    color: #1a6b61;
+    border: 1px solid var(--color-ideal);
+}
+
+.status-moderate {
+    border-top-color: var(--color-moderate);
+}
+.status-moderate .status-alert {
+    background-color: #fdf8eb;
+    color: #9c7b16;
+    border: 1px solid var(--color-moderate);
+}
+
+.status-critical {
+    border-top-color: var(--color-critical);
+}
+.status-critical .status-alert {
+    background-color: #fcece8;
+    color: #a33219;
+    border: 1px solid var(--color-critical);
+}
+
+/* Info Card */
+.irrigation-time {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    background-color: #e9ecef;
+    padding: 1rem;
+    border-radius: 8px;
+}
+
+.irrigation-time span {
+    font-size: 3rem;
+    font-weight: 700;
+    color: var(--header-bg);
+}
+
+.irrigation-time .unit {
+    font-size: 1.2rem;
+    font-weight: normal;
+    color: #555;
+    display: block;
+}
+
+.thesis-data h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    color: #555;
+}
+
+.thesis-data ul {
+    list-style: none;
+    padding: 0;
+}
+
+.thesis-data li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.1rem;
+}
+
+.thesis-data li:last-child {
+    border-bottom: none;
+}
+
+/* History Card */
+.history-list-container {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.history-list {
+    list-style: none;
+    padding: 0;
+}
+
+.history-list li {
+    padding: 0.75rem;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.history-list li:last-child {
+    border-bottom: none;
+}
+
+.history-time {
+    font-weight: 600;
+    color: #555;
+}
+
+.history-moisture {
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.history-status {
+    font-size: 0.9rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+}
+
+.hist-ideal { background-color: #e6f7f5; color: #1a6b61; }
+.hist-moderate { background-color: #fdf8eb; color: #9c7b16; }
+.hist-critical { background-color: #fcece8; color: #a33219; }
