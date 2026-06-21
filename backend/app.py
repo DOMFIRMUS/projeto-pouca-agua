@@ -21,7 +21,12 @@ dados_sistema = {
     "solo_pmp": 0.14,               # Ponto de murcha permanente m³/m³
     "profundidade_raiz_m": 0.40,    # Raiz do cultivo atual (0.4 metros)
     "fator_deplecao_f": 0.50,       # Fator f da tabela 6 da tese
-    "porcentagem_umedecida_pw": 50.0 # Gotejamento cobre 50% da área
+    "porcentagem_umedecida_pw": 50.0, # Gotejamento cobre 50% da área
+    "espacamento_plantas_m": 0.5,   # Espaçamento entre plantas na fileira
+    "espacamento_fileiras_m": 1.0   # Espaçamento entre fileiras
+    "ce_solo_min": 1.0,             # Condutividade elétrica mínima do solo suportada (dS/m) - padrão
+    "ce_solo_max": 3.0,             # Condutividade elétrica máxima tolerada pela cultura (dS/m)
+    "uniformidade_emissao_decimal": 0.90 # Uniformidade de emissão do gotejador (90%)
 }
 
 @app.route('/api/status', methods=['GET'])
@@ -62,19 +67,43 @@ def obter_status():
         etc_calculada=eto
     )
 
+    # Cálculo do Turno de Rega Máximo (TR_max)
+    # Assumindo etc_mm_dia aproximadamente igual a eto para simplificação (Kc = 1.0)
+    turno_rega_max_dias = calculador.calcular_turno_rega_max(
+        irn_max_mm=irn_max,
+        etc_mm_dia=eto,
+        sp_m=dados_sistema["espacamento_plantas_m"],
+        sr_m=dados_sistema["espacamento_fileiras_m"]
+    # Verifica se foi enviada a condutividade elétrica da água via query params
+    ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
+
+    fl, itn = calculador.calcular_itn(
+        irn_max,
+        ce_agua_ds_m,
+        dados_sistema["ce_solo_min"],
+        dados_sistema["ce_solo_max"],
+        dados_sistema["uniformidade_emissao_decimal"]
+    )
+
     # 2. Avalia situação atual do sensor
     analise = calculador.avaliar_status_solo(umidade_atual)
 
     # Cálculo dinâmico do tempo de rega baseado na lâmina necessária (IRN) e ETo
     if analise["irrigar"]:
-        # Se precisa irrigar, estima lâmina proporcional ao défice atual
+        # Se precisa irrigar, estima lâmina proporcional ao défice atual usando o ITN ao invés do irn_max
         defice_proporcional = (dados_sistema["solo_cc"] - (umidade_atual/100 * dados_sistema["solo_cc"]))
-        tempo_estimado_minutos = round((defice_proporcional * irn_max * 60) / max(eto, 1), 1)
+        tempo_estimado_minutos = round((defice_proporcional * itn * 60) / max(eto, 1), 1)
     else:
         tempo_estimado_minutos = 0.0
 
+    tempo_irrigacao_calculado_minutos = max(tempo_estimado_minutos, 0.0)
+
+    # Fracionamento do tempo de irrigação
+    tempo_irrigacao_horas = tempo_irrigacao_calculado_minutos / 60.0
+    agenda_rega = calculador.fracionar_tempo_irrigacao(tempo_irrigacao_horas)
+
     # Atualiza o status e o tempo calculado no banco de dados
-    update_leitura_status(leitura_id, analise["status"], max(tempo_estimado_minutos, 0.0))
+    update_leitura_status(leitura_id, analise["status"], tempo_irrigacao_calculado_minutos)
 
     return jsonify({
         "umidade_atual": umidade_atual,
@@ -82,10 +111,16 @@ def obter_status():
         "cor_alerta": analise["cor_alerta"],
         "mensagem_acao": analise["mensagem"],
         "precisa_irrigar": analise["irrigar"],
+        "agenda_rega": agenda_rega,
+        "turno_rega_max_dias": turno_rega_max_dias,
+        "lamina_bruta_irrigacao_mm": itn,
         "metricas_tese": {
             "evapotranspiracao_referencia_mm_dia": eto,
             "capacidade_agua_disponivel_solo_mm": cad,
             "irrigacao_real_necessaria_max_mm": irn_max,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos
+            "fracao_lixiviacao": fl,
+            "irrigacao_total_necessaria_mm": itn,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0)
         }
     }), 200
@@ -126,6 +161,23 @@ def obter_historico():
 def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
+
+@app.route('/api/hidraulica', methods=['POST'])
+def obter_hidraulica():
+    dados_recebidos = request.get_json()
+    if not dados_recebidos or 'So' not in dados_recebidos or 'k_linha' not in dados_recebidos or 'L_estimado' not in dados_recebidos:
+        return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+
+    try:
+        So = float(dados_recebidos['So'])
+        k_linha = float(dados_recebidos['k_linha'])
+        L_estimado = float(dados_recebidos['L_estimado'])
+    except ValueError:
+        return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+
+    classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+
+    return jsonify({"classificacao": classificacao}), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
