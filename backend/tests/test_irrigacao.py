@@ -100,3 +100,18 @@ def test_calcular_perda_carga_total():
     # Test D = 0
     hf_zero = calc.calcular_perda_carga_total(0.02, 100, 0.0, 1.5, 'online', 200, 20)
     assert hf_zero == 0.0
+
+def test_dimensionar_diametro_trecho():
+    calc = CalculadorIrrigacao()
+    # f=0.02, q=0.005, dz=2.0, L=100.0, h0=10.0
+    # hf = 2.0
+    # D = ((8.263e-2 * 0.02 * (0.005**2) * 100.0) / 2.0) ** 0.2
+    # D = ((0.0016526 * 0.000025 * 100.0) / 2.0) ** 0.2
+    # D = ((0.0000041315) / 2.0) ** 0.2 = (0.00000206575) ** 0.2
+    # D ~ 0.072948
+    d_teorico = calc.dimensionar_diametro_trecho(0.02, 0.005, 2.0, 100.0, 10.0)
+    assert round(d_teorico, 6) == 0.072948
+
+    # Test dz <= 0
+    d_zero = calc.dimensionar_diametro_trecho(0.02, 0.005, 0.0, 100.0, 10.0)
+    assert d_zero == 0.0
