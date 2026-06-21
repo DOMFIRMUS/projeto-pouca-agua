@@ -45,6 +45,9 @@ def test_status_get(client):
     data = json.loads(response.data)
     assert data['umidade_atual'] == 40.0
     assert 'status_solo' in data
+    assert 'metricas_tese' in data
+    assert 'tempo_irrigacao_horas' in data['metricas_tese']
+    assert 'numero_emissores_por_planta' in data['metricas_tese']
     assert 'turno_rega_max_dias' in data
     assert isinstance(data['turno_rega_max_dias'], int)
     assert 'lamina_bruta_irrigacao_mm' in data
@@ -75,6 +78,9 @@ def test_status_get_blaney_criddle(client):
     data = json.loads(response.data)
     assert data['umidade_atual'] == 40.0
     assert 'status_solo' in data
+    assert 'metricas_tese' in data
+    assert 'tempo_irrigacao_horas' in data['metricas_tese']
+    assert 'numero_emissores_por_planta' in data['metricas_tese']
 
 def test_historico_get(client):
     client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})

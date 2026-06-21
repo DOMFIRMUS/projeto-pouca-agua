@@ -155,6 +155,24 @@ class CalculadorIrrigacao:
 
         return round(hf, 4)
 
+    def calcular_tempo_irrigacao(self, itn_mm, espacamento_plantas_sp, espacamento_fileiras_sr, pw_area_umedecida, dw_diametro_molhado, vazao_emissor_qa):
+        """
+        Calcula o número de emissores por planta (Np) e o Tempo de Irrigação (TI) em horas.
+        """
+        if dw_diametro_molhado <= 0 or vazao_emissor_qa <= 0:
+            return 0.0, 1
+
+        # Np_teorico = (4 * Sp * Sr * Pw) / (pi * Dw^2 * 100)
+        np_teorico = (4 * espacamento_plantas_sp * espacamento_fileiras_sr * pw_area_umedecida) / (math.pi * (dw_diametro_molhado ** 2) * 100)
+        np = math.ceil(np_teorico)
+
+        if np <= 0:
+            np = 1
+
+        # TI = (ITN * Sp * Sr) / (Np * Qa)
+        ti = (itn_mm * espacamento_plantas_sp * espacamento_fileiras_sr) / (np * vazao_emissor_qa)
+
+        return ti, np
     def perda_direta_derivacao(self, vel_derivacao_vd, diametro_derivacao_dd, area_protrusao_ap):
         """
         Calcula a Perda Localizada de Carga por Passagem Direta em conectores (Modelo de Vilaça, Eq 76).
