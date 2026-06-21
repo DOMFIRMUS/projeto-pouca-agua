@@ -161,6 +161,39 @@ def test_calcular_perda_carga_total():
     hf_zero = calc.calcular_perda_carga_total(0.02, 100, 0.0, 1.5, 'online', 200, 20)
     assert hf_zero == 0.0
 
+def test_calcular_area_umedecida():
+    calc = CalculadorIrrigacao()
+    # Test values:
+    # q_vazao = 2.0 (L/h)
+    # volume_z = 30.0 (L)
+    # ko_condutividade = 15.0 (mm/h)
+    # espacamento_plantas_sp = 2.0 (m)
+    # espacamento_fileiras_sr = 3.0 (m)
+    # numero_emissores_np = 1
+
+    # Dw = 1.32 * ((30.0 * 2.0) / 15.0) ** (1/3)
+    # Dw = 1.32 * (60.0 / 15.0) ** (1/3)
+    # Dw = 1.32 * 4.0 ** (1/3)
+    # 4.0 ** (1/3) is approximately 1.5874
+    # Dw = 1.32 * 1.5874 = 2.0953 -> rounded 2.10
+
+    # Pw = 1 * ((math.pi * (2.0953 ** 2)) / (4 * 2.0 * 3.0)) * 100
+    # math.pi * 4.390 / 24.0 * 100
+    # 3.14159 * 4.390 / 24.0 * 100 = 13.791 / 24.0 * 100 = 57.46% -> rounded
+
+    dw, pw = calc.calcular_area_umedecida(2.0, 30.0, 15.0, 2.0, 3.0, 1)
+
+    assert dw == 2.10
+    # Recalculate accurate expectation based on precision
+    import math
+    dw_calc = 1.32 * ((30.0 * 2.0) / 15.0) ** (1/3)
+    pw_calc = 1 * ((math.pi * (dw_calc ** 2)) / (4 * 2.0 * 3.0)) * 100
+    assert pw == round(pw_calc, 2)
+
+    # Test division by zero handlers
+    dw_zero, pw_zero = calc.calcular_area_umedecida(2.0, 30.0, 0.0, 2.0, 3.0, 1)
+    assert dw_zero == 0.0
+    assert pw_zero == 0.0
 def test_perda_direta_derivacao():
     calc = CalculadorIrrigacao()
     # Test with vd = 1.0, dd = 0.016, ap = 0.0001
