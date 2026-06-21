@@ -25,9 +25,9 @@ dados_sistema = {
     "espacamento_plantas_sp": 0.5,
     "espacamento_fileiras_sr": 1.0,
     "dw_diametro_molhado": 0.3,
-    "vazao_emissor_qa": 2.0
+    "vazao_emissor_qa": 2.0,
     "espacamento_plantas_m": 0.5,   # Espaçamento entre plantas na fileira
-    "espacamento_fileiras_m": 1.0   # Espaçamento entre fileiras
+    "espacamento_fileiras_m": 1.0,   # Espaçamento entre fileiras
     "ce_solo_min": 1.0,             # Condutividade elétrica mínima do solo suportada (dS/m) - padrão
     "ce_solo_max": 3.0,             # Condutividade elétrica máxima tolerada pela cultura (dS/m)
     "uniformidade_emissao_decimal": 0.90 # Uniformidade de emissão do gotejador (90%)
@@ -96,6 +96,8 @@ def obter_status():
         etc_mm_dia=eto,
         sp_m=dados_sistema["espacamento_plantas_m"],
         sr_m=dados_sistema["espacamento_fileiras_m"]
+    )
+
     # Verifica se foi enviada a condutividade elétrica da água via query params
     ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
 
@@ -155,8 +157,7 @@ def obter_status():
             "irrigacao_real_necessaria_max_mm": irn_max,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
             "tempo_irrigacao_horas": ti_horas,
-            "numero_emissores_por_planta": np_emissores
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos
+            "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0)
@@ -232,7 +233,7 @@ def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
 
-@app.route('/api/hidraulica', methods=['POST'])
+@app.route('/api/hidraulica_classificacao', methods=['POST'])
 def obter_hidraulica():
     dados_recebidos = request.get_json()
     if not dados_recebidos or 'So' not in dados_recebidos or 'k_linha' not in dados_recebidos or 'L_estimado' not in dados_recebidos:
@@ -248,6 +249,140 @@ def obter_hidraulica():
     classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
 
     return jsonify({"classificacao": classificacao}), 200
+
+
+@app.route('/api/relatorio-dimensionamento', methods=['GET'])
+def relatorio_dimensionamento():
+    ultima_leitura = get_ultima_leitura()
+    if not ultima_leitura:
+        return jsonify({"erro": "Nenhuma leitura encontrada no banco de dados."}), 404
+
+    temperatura_max = ultima_leitura['temperatura_max']
+    temperatura_min = ultima_leitura['temperatura_min']
+    umidade_atual = ultima_leitura['umidade']
+
+    culturas = get_culturas()
+    kc_atual = 1.0 # Default fallback
+    if culturas:
+        cultura_ativa = culturas[0]
+        kc_atual = calculador.obter_kc_atual(
+            data_plantio=cultura_ativa['data_plantio'],
+            dias_fases={
+                'inicial': cultura_ativa['dias_fase_inicial'],
+                'meia_estacao': cultura_ativa['dias_meia_estacao'],
+                'final': cultura_ativa['dias_fase_final']
+            },
+            kc_valores={
+                'inicial': cultura_ativa['kc_inicial'],
+                'media': cultura_ativa['kc_media'],
+                'final': cultura_ativa['kc_final']
+            }
+        )
+
+    metodo_eto = request.args.get('metodo_eto', 'hargreaves')
+    t_media = (temperatura_max + temperatura_min) / 2
+
+    if metodo_eto.lower() == 'blaney-criddle':
+        eto = calculador.calcular_eto_blaney_criddle(
+            t_media,
+            mes_index=dados_sistema["mes_atual"]
+        )
+    else:
+        eto = calculador.calcular_eto_hargreaves(
+            temperatura_max,
+            temperatura_min,
+            latitude=-22.0,
+            mes_index=dados_sistema["mes_atual"]
+        )
+
+    cad, irn_max = calculador.calcular_irn_e_cad(
+        dados_sistema["solo_cc"],
+        dados_sistema["solo_pmp"],
+        dados_sistema["profundidade_raiz_m"],
+        dados_sistema["fator_deplecao_f"],
+        dados_sistema["porcentagem_umedecida_pw"],
+        etc_calculada=eto
+    )
+
+    turno_rega_max_dias = calculador.calcular_turno_rega_max(
+        irn_max_mm=irn_max,
+        etc_mm_dia=eto,
+        sp_m=dados_sistema["espacamento_plantas_m"],
+        sr_m=dados_sistema["espacamento_fileiras_m"]
+    )
+
+    ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
+
+    fl, itn = calculador.calcular_itn(
+        irn_max,
+        ce_agua_ds_m,
+        dados_sistema["ce_solo_min"],
+        dados_sistema["ce_solo_max"],
+        dados_sistema["uniformidade_emissao_decimal"]
+    )
+
+    # Hydraulic variables
+    diametro_m = 0.016
+    diametro_mm = 16.0
+    vazao_emissor_lh = dados_sistema["vazao_emissor_qa"]
+    vazao_emissor_m3s = vazao_emissor_lh / 3600000.0
+    espacamento_m = dados_sistema["espacamento_plantas_m"]
+    pressao_entrada_mca = 10.0
+    declividade = 0.0
+    hvar_max = pressao_entrada_mca * 0.20
+
+    comprimento_maximo = calculador.comprimento_trecho_a_trecho(
+        diametro_m=diametro_m,
+        vazao_emissor_m3s=vazao_emissor_m3s,
+        espacamento_m=espacamento_m,
+        pressao_entrada_mca=pressao_entrada_mca,
+        declividade=declividade,
+        hvar_max=hvar_max
+    )
+
+    resultado_perda = calculador.calcular_perda_carga(
+        diametro_mm=diametro_mm,
+        vazao_gotejador_lh=vazao_emissor_lh,
+        espacamento_m=espacamento_m,
+        comprimento_m=comprimento_maximo
+    )
+    perda_carga_total = resultado_perda.get('perda_carga_mca', 0.0)
+
+    # Derivation line variables
+    fator_atrito_f = 0.04
+    vazao_trecho_q = vazao_emissor_m3s * (comprimento_maximo / espacamento_m)
+    desnivel_trecho_dz = 1.0
+    comprimento_trecho_L = 50.0
+    h0 = 10.0
+
+    diametro_derivacao = calculador.dimensionar_diametro_trecho(
+        fator_atrito_f=fator_atrito_f,
+        vazao_trecho_q=vazao_trecho_q,
+        desnivel_trecho_dz=desnivel_trecho_dz,
+        comprimento_trecho_L=comprimento_trecho_L,
+        h0=h0
+    )
+
+    diametro_derivacao_mm = diametro_derivacao * 1000
+
+    alertas = []
+    if perda_carga_total > (pressao_entrada_mca * 0.20):
+        alertas.append("Variação de pressão ultrapassa 20% do recomendado.")
+    if fl > 0:
+        alertas.append(f"A salinidade da água exige lavagem do solo. Fração de Lixiviação: {fl * 100:.2f}%")
+
+    relatorio_compra = {
+        "eto": f"{eto:.2f} mm/dia",
+        "kc_atual": f"{kc_atual:.2f}",
+        "irrigacao_total_necessaria": f"{itn:.2f} mm",
+        "turno_rega_maximo": f"{turno_rega_max_dias} dias",
+        "comprimento_maximo_lateral": f"{comprimento_maximo:.2f} m",
+        "perda_carga_total": f"{perda_carga_total:.2f} mca",
+        "diametro_sugerido_derivacao": f"{diametro_derivacao_mm:.2f} mm",
+        "alertas": alertas
+    }
+
+    return jsonify({"relatorio_compra": relatorio_compra}), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
