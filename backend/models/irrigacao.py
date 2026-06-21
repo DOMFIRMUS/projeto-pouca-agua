@@ -46,6 +46,36 @@ class CalculadorIrrigacao:
         irn_max = cad * fator_f * fw
         return round(cad, 2), round(irn_max, 2)
 
+    def calcular_kl(self, metodo, p_decimal):
+        """
+        Calcula o Coeficiente de Localização (KL) para irrigação localizada.
+        'p_decimal' é a fração da área umedecida ou sombreada (o que for maior).
+        """
+        if metodo == 'Keller':
+            kl = p_decimal + 0.15 * (1 - p_decimal)
+        elif metodo == 'Bernardo':
+            kl = p_decimal
+        elif metodo == 'Fereres':
+            if p_decimal >= 0.65:
+                kl = 1.0
+            elif 0.20 < p_decimal < 0.65:
+                kl = (1.09 * p_decimal) + 0.30
+            else:
+                kl = (1.94 * p_decimal) + 0.10
+        elif metodo == 'Keller_Bliesner':
+            kl = 0.10 * math.sqrt(p_decimal * 100)
+        else:
+            kl = 1.0
+        return round(kl, 2)
+
+    def calcular_etc(self, eto, kc, kl=1.0):
+        """
+        Calcula a Evapotranspiração da Cultura (ETc) usando ETo, Kc e KL.
+        ETc = ETo * Kc * KL
+        """
+        etc = eto * kc * kl
+        return round(etc, 2)
+
     def avaliar_status_solo(self, valor_umidade):
         if valor_umidade < self.umidade_critica:
             return {"status": "Crítico (Seco)", "cor_alerta": "danger", "irrigar": True, "mensagem": "Solo excessivamente seco. Ligue a irrigação."}
