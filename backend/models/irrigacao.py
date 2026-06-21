@@ -102,3 +102,15 @@ class CalculadorIrrigacao:
             return {"status": "Ideal", "cor_alerta": "success", "irrigar": False, "mensagem": "Solo com umidade perfeita."}
         else:
             return {"status": "Encharcado", "cor_alerta": "info", "irrigar": False, "mensagem": "Solo muito úmido. Evite desperdiçar água."}
+
+    def calcular_area_umedecida(self, q_vazao, volume_z, ko_condutividade, espacamento_plantas_sp, espacamento_fileiras_sr, numero_emissores_np):
+        """
+        Calcula o Diâmetro Molhado (Dw) e a Porcentagem de Área Umedecida (Pw).
+        """
+        if ko_condutividade <= 0 or espacamento_plantas_sp <= 0 or espacamento_fileiras_sr <= 0:
+            return 0.0, 0.0
+
+        dw = 1.32 * ((volume_z * q_vazao) / ko_condutividade) ** (1/3)
+        pw = numero_emissores_np * ((math.pi * (dw ** 2)) / (4 * espacamento_plantas_sp * espacamento_fileiras_sr)) * 100
+
+        return round(dw, 2), round(pw, 2)
