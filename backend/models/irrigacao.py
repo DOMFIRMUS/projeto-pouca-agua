@@ -42,7 +42,16 @@ class CalculadorIrrigacao:
         eto = 0.0023 * ra * 0.408 * term_temp * term_diff
         return round(eto, 2)
 
-    def calcular_irn_e_cad(self, tomcc, to_pmp, profundidade_z, fator_f, pw_percent):
+    def corrigir_fator_deplecao(self, f_tabela, etc_calculada):
+        """
+        Corrige dinamicamente o fator de depleção (f) baseado na Evapotranspiração da Cultura (ETc),
+        conforme Equação 39 da tese.
+        O valor retornado é limitado entre 0.1 e 0.8 para proteger a planta.
+        """
+        f_corrigido = f_tabela + 0.04 * (5 - etc_calculada)
+        return max(0.1, min(0.8, round(f_corrigido, 4)))
+
+    def calcular_irn_e_cad(self, tomcc, to_pmp, profundidade_z, fator_f, pw_percent, etc_calculada=None):
         """
         Calcula a Capacidade de Água Disponível (CAD) e a Irrigação Real Necessária Máxima (IRN_max)
         baseado no solo e na fração de área umedecida (Equações 36 e 40 da tese).
@@ -52,6 +61,10 @@ class CalculadorIrrigacao:
 
         # Fração de área umedecida (decimal)
         fw = pw_percent / 100.0
+
+        # Corrige o fator de depleção caso a ETc tenha sido fornecida
+        if etc_calculada is not None:
+            fator_f = self.corrigir_fator_deplecao(fator_f, etc_calculada)
 
         # Equação 40: IRN_max = CAD * f * Fw
         irn_max = cad * fator_f * fw
