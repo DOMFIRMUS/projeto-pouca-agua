@@ -46,6 +46,43 @@ class CalculadorIrrigacao:
         irn_max = cad * fator_f * fw
         return round(cad, 2), round(irn_max, 2)
 
+    def comprimento_trecho_a_trecho(self, diametro_m, vazao_emissor_m3s, espacamento_m, pressao_entrada_mca, declividade, hvar_max):
+        """
+        Calcula o comprimento máximo da linha lateral trecho a trecho (do último emissor para o primeiro).
+        """
+        pressao_ultimo_emissor = pressao_entrada_mca
+        pressao_anterior = pressao_ultimo_emissor
+        comprimento_total = 0.0
+        i = 1
+
+        area = math.pi * (diametro_m ** 2) / 4.0
+
+        while True:
+            vazao_acumulada_m3s = i * vazao_emissor_m3s
+            v = vazao_acumulada_m3s / area
+            r = (v * diametro_m) / 1.01e-6
+
+            if r < 2000:
+                f = 64 / r if r > 0 else 0
+            elif 2000 <= r < 3000:
+                f = 0.04
+            else:
+                f = 0.316 / (r ** 0.25)
+
+            hf = 8.263e-2 * f * (vazao_acumulada_m3s ** 2 / diametro_m ** 5) * espacamento_m
+
+            # Pressão no emissor atual = pressão do emissor anterior + perda de carga + desnível
+            pressao_atual = pressao_anterior + hf + (declividade * espacamento_m)
+
+            if abs(pressao_atual - pressao_ultimo_emissor) > hvar_max:
+                break
+
+            comprimento_total += espacamento_m
+            pressao_anterior = pressao_atual
+            i += 1
+
+        return comprimento_total
+
     def avaliar_status_solo(self, valor_umidade):
         if valor_umidade < self.umidade_critica:
             return {"status": "Crítico (Seco)", "cor_alerta": "danger", "irrigar": True, "mensagem": "Solo excessivamente seco. Ligue a irrigação."}
