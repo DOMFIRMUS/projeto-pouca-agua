@@ -93,6 +93,17 @@ class CalculadorIrrigacao:
 
         return round(hf, 4)
 
+    def perda_direta_derivacao(self, vel_derivacao_vd, diametro_derivacao_dd, area_protrusao_ap):
+        """
+        Calcula a Perda Localizada de Carga por Passagem Direta em conectores (Modelo de Vilaça, Eq 76).
+        Retorna o valor em m.c.a.
+        """
+        if diametro_derivacao_dd <= 0:
+            return 0.0
+
+        hfl_d = 0.043695 * (vel_derivacao_vd ** 1.897) * (diametro_derivacao_dd ** -2.428) * (area_protrusao_ap ** 1.109)
+        return round(hfl_d, 4)
+
     def avaliar_status_solo(self, valor_umidade):
         if valor_umidade < self.umidade_critica:
             return {"status": "Crítico (Seco)", "cor_alerta": "danger", "irrigar": True, "mensagem": "Solo excessivamente seco. Ligue a irrigação."}

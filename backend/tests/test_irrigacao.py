@@ -100,3 +100,20 @@ def test_calcular_perda_carga_total():
     # Test D = 0
     hf_zero = calc.calcular_perda_carga_total(0.02, 100, 0.0, 1.5, 'online', 200, 20)
     assert hf_zero == 0.0
+
+def test_perda_direta_derivacao():
+    calc = CalculadorIrrigacao()
+    # Test with vd = 1.0, dd = 0.016, ap = 0.0001
+    # Hfl_d = 0.043695 * (1.0 ** 1.897) * (0.016 ** -2.428) * (0.0001 ** 1.109)
+    # Hfl_d = 0.043695 * 1.0 * 23157.079 * 0.0000363078
+    # Hfl_d ~= 0.0367
+
+    hfl_d = calc.perda_direta_derivacao(1.0, 0.016, 0.0001)
+
+    # We can calculate the exact expected mathematical result inline to be robust
+    expected = round(0.043695 * (1.0 ** 1.897) * (0.016 ** -2.428) * (0.0001 ** 1.109), 4)
+    assert hfl_d == expected
+
+    # Test dd = 0
+    hfl_d_zero = calc.perda_direta_derivacao(1.0, 0.0, 0.0001)
+    assert hfl_d_zero == 0.0
