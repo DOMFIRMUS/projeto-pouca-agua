@@ -385,3 +385,43 @@ def test_calcular_pressao_inicial_bomba():
     pressao = calc.calcular_pressao_inicial_bomba(10.0, 2.0, 0.016, 0.05, 1.5, 1.0)
     assert isinstance(pressao, float)
     assert round(pressao, 3) == 12.126
+
+def test_calcular_rn():
+    calc = CalculadorIrrigacao()
+    # Case 1: Normal conditions
+    t_max_c = 30.0
+    t_min_c = 20.0
+    ea = 2.0
+    rs = 20.0
+    rso = 25.0
+    rns = 15.0
+
+    r_nl, r_n = calc.calcular_rn(t_max_c, t_min_c, ea, rs, rso, rns)
+
+    assert isinstance(r_nl, float)
+    assert isinstance(r_n, float)
+
+    # We assert closeness rather than strict equality due to floats
+    # Test values obtained from previous run on exactly the same equation:
+    # (4.023775219015518, 10.97622478098448)
+    assert round(r_nl, 4) == 4.0238
+    assert round(r_n, 4) == 10.9762
+
+    # Case 2: rso = 0 -> should return 0.0, 0.0
+    r_nl_zero, r_n_zero = calc.calcular_rn(30.0, 20.0, 2.0, 20.0, 0.0, 15.0)
+    assert r_nl_zero == 0.0
+    assert r_n_zero == 0.0
+
+    # Case 3: ea < 0 -> should default ea to 0.0
+    r_nl_neg, r_n_neg = calc.calcular_rn(30.0, 20.0, -1.0, 20.0, 25.0, 15.0)
+    # recalculate expected value internally
+    sigma = 4.903e-9
+    t_max_k = 30.0 + 273.16
+    t_min_k = 20.0 + 273.16
+    termo_temperatura = (sigma * (t_max_k ** 4) + sigma * (t_min_k ** 4)) / 2.0
+    termo_umidade = 0.34 - 0.14 * 0.0 # math.sqrt(0.0)
+    termo_nebulosidade = 1.35 * (20.0 / 25.0) - 0.35
+    exp_rnl = termo_temperatura * termo_umidade * termo_nebulosidade
+    exp_rn = 15.0 - exp_rnl
+    assert round(r_nl_neg, 4) == round(exp_rnl, 4)
+    assert round(r_n_neg, 4) == round(exp_rn, 4)

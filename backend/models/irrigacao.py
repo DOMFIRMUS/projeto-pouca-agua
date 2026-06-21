@@ -454,3 +454,30 @@ class CalculadorIrrigacao:
         hfl_l = self.perda_conector_lateral(diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms)
         pressao_inicial = pressao_emissor + perda_carga_tubulacao + hfl_l
         return pressao_inicial
+
+    def calcular_rn(self, t_max_c, t_min_c, ea, rs, rso, rns):
+        """
+        Calcula a Radiação de Onda Longa (Rnl) e o Saldo de Radiação (Rn)
+        utilizando o balanço de energia do modelo Penman-Monteith.
+        """
+        if rso <= 0:
+            return 0.0, 0.0
+
+        if ea < 0:
+            ea = 0.0
+
+        t_max_k = t_max_c + 273.16
+        t_min_k = t_min_c + 273.16
+        sigma = 4.903e-9
+
+        # Equação 19
+        termo_temperatura = (sigma * (t_max_k ** 4) + sigma * (t_min_k ** 4)) / 2.0
+        termo_umidade = 0.34 - 0.14 * math.sqrt(ea)
+        termo_nebulosidade = 1.35 * (rs / rso) - 0.35
+
+        r_nl = termo_temperatura * termo_umidade * termo_nebulosidade
+
+        # Equação 20
+        r_n = rns - r_nl
+
+        return r_nl, r_n

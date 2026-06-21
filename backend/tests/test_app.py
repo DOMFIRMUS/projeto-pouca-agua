@@ -94,33 +94,38 @@ def test_historico_get(client):
     assert data[1]['umidade'] == 40.0
 
 def test_hidraulica_post_success(client):
-    response = client.post('/api/hidraulica', json={
-        'So': 0.5,
-        'k_linha': 1.0,
-        'L_estimado': 1.0
-    })
+    payload = {
+        "diametro_mm": 16,
+        "vazao_gotejador_lh": 2,
+        "espacamento_m": 0.5,
+        "comprimento_m": 50
+    }
+    response = client.post('/api/hidraulica', data=json.dumps(payload), content_type='application/json')
     assert response.status_code == 200
     data = json.loads(response.data)
-    assert 'classificacao' in data
-    assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
+    assert data['vazao_total_lh'] == 200.0
+    assert 'perda_carga_mca' in data
+    assert data['status'] == "Aceitável"
 
 def test_hidraulica_post_missing_fields(client):
-    response = client.post('/api/hidraulica', json={
-        'So': 0.5,
-        'k_linha': 1.0
-    })
+    payload = {
+        "diametro_mm": 16
+    }
+    response = client.post('/api/hidraulica', data=json.dumps(payload), content_type='application/json')
     assert response.status_code == 400
     data = json.loads(response.data)
     assert 'erro' in data
-    assert "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios." in data['erro']
+    assert "O campo 'vazao_gotejador_lh' é obrigatório." in data['erro']
 
 def test_hidraulica_post_invalid_type(client):
-    response = client.post('/api/hidraulica', json={
-        'So': 'abc',
-        'k_linha': 1.0,
-        'L_estimado': 1.0
-    })
+    payload = {
+        "diametro_mm": "abc",
+        "vazao_gotejador_lh": 2,
+        "espacamento_m": 0.5,
+        "comprimento_m": 50
+    }
+    response = client.post('/api/hidraulica', data=json.dumps(payload), content_type='application/json')
     assert response.status_code == 400
     data = json.loads(response.data)
     assert 'erro' in data
-    assert "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos." in data['erro']
+    assert "Todos os parâmetros devem ser números válidos." in data['erro']
