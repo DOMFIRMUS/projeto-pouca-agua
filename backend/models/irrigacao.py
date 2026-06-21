@@ -102,3 +102,20 @@ class CalculadorIrrigacao:
             return {"status": "Ideal", "cor_alerta": "success", "irrigar": False, "mensagem": "Solo com umidade perfeita."}
         else:
             return {"status": "Encharcado", "cor_alerta": "info", "irrigar": False, "mensagem": "Solo muito úmido. Evite desperdiçar água."}
+
+    def perda_conector_lateral(self, diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms):
+        """
+        Calcula a Perda Localizada de Carga por conexão de entrada em MCA.
+        Equação 77 da Tese (modelo de Vilaça).
+        """
+        hfl_l = 2.268121 * (diametro_conector_m ** 0.106) * (comprimento_conector_m ** 1.057) * (vel_conector_ms ** 1.766) * (vel_lateral_ms ** 0.386)
+        return hfl_l
+
+    def calcular_pressao_inicial_bomba(self, pressao_emissor, perda_carga_tubulacao, diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms):
+        """
+        Método principal de perda de carga:
+        Calcula a pressão inicial necessária da bomba adicionando a perda de carga localizada (Hfl_l).
+        """
+        hfl_l = self.perda_conector_lateral(diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms)
+        pressao_inicial = pressao_emissor + perda_carga_tubulacao + hfl_l
+        return pressao_inicial
