@@ -111,5 +111,22 @@ def obter_historico():
     historico = get_historico()
     return jsonify(historico), 200
 
+@app.route('/api/hidraulica', methods=['POST'])
+def obter_hidraulica():
+    dados_recebidos = request.get_json()
+    if not dados_recebidos or 'So' not in dados_recebidos or 'k_linha' not in dados_recebidos or 'L_estimado' not in dados_recebidos:
+        return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+
+    try:
+        So = float(dados_recebidos['So'])
+        k_linha = float(dados_recebidos['k_linha'])
+        L_estimado = float(dados_recebidos['L_estimado'])
+    except ValueError:
+        return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+
+    classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+
+    return jsonify({"classificacao": classificacao}), 200
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

@@ -55,3 +55,25 @@ class CalculadorIrrigacao:
             return {"status": "Ideal", "cor_alerta": "success", "irrigar": False, "mensagem": "Solo com umidade perfeita."}
         else:
             return {"status": "Encharcado", "cor_alerta": "info", "irrigar": False, "mensagem": "Solo muito úmido. Evite desperdiçar água."}
+
+    def classificar_perfil_pressao(self, So, k_linha, L_estimado):
+        """
+        Classifica o perfil de pressão hidráulica baseado na tese.
+        So: declividade em decimal
+        k_linha: constante da linha
+        L_estimado: comprimento estimado
+        """
+        if So <= 0:
+            return 'Perfil Tipo I (Aclive ou Nível)'
+
+        J = k_linha * (L_estimado ** 1.75)
+        razao = So / J
+
+        if 0 < razao < 1:
+            return 'Perfil Tipo IIa (Declive Fraco)'
+        elif razao == 1:
+            return 'Perfil Tipo IIb (Declive Moderado)'
+        elif 1 < razao < 2.75:
+            return 'Perfil Tipo IIc (Declive Forte)'
+        else:
+            return 'Perfil Tipo IId (Declive Muito Forte)'
