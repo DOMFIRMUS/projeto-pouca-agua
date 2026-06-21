@@ -56,6 +56,56 @@ class CalculadorIrrigacao:
         irn_max = cad * fator_f * fw
         return round(cad, 2), round(irn_max, 2)
 
+    def calcular_kl(self, metodo, p_decimal):
+        """
+        Calcula o Coeficiente de Localização (KL) para irrigação localizada.
+        'p_decimal' é a fração da área umedecida ou sombreada (o que for maior).
+        """
+        if metodo == 'Keller':
+            kl = p_decimal + 0.15 * (1 - p_decimal)
+        elif metodo == 'Bernardo':
+            kl = p_decimal
+        elif metodo == 'Fereres':
+            if p_decimal >= 0.65:
+                kl = 1.0
+            elif 0.20 < p_decimal < 0.65:
+                kl = (1.09 * p_decimal) + 0.30
+            else:
+                kl = (1.94 * p_decimal) + 0.10
+        elif metodo == 'Keller_Bliesner':
+            kl = 0.10 * math.sqrt(p_decimal * 100)
+        else:
+            kl = 1.0
+        return round(kl, 2)
+
+    def calcular_etc(self, eto, kc, kl=1.0):
+        """
+        Calcula a Evapotranspiração da Cultura (ETc) usando ETo, Kc e KL.
+        ETc = ETo * Kc * KL
+        """
+        etc = eto * kc * kl
+        return round(etc, 2)
+    def calcular_itn(self, irn_mm, ce_agua_ds_m, ce_solo_min, ce_solo_max, uniformidade_emissao_decimal):
+        """
+        Calcula a Irrigação Total Necessária (ITN) e a Fração de Lixiviação (FL)
+        com base nas Equações 42 e 43 da tese.
+        """
+        # Equação 43: FL = CEa / (2 * CEes_max)
+        fl = ce_agua_ds_m / (2 * ce_solo_max)
+
+        # Limitar o FL a valores viáveis para evitar divisão por zero ou negativa na eq. 42
+        if fl >= 1.0:
+            fl = 0.99
+        elif fl < 0.0:
+            fl = 0.0
+
+        # Equação 42: ITN = IRN / ((1 - FL) * EAP * Ea)
+        # Assumindo EAP = 1.0 (Eficiência de Aplicação) e Ea = uniformidade_emissao_decimal
+        eap = 1.0
+        itn = irn_mm / ((1 - fl) * eap * uniformidade_emissao_decimal)
+
+        return round(fl, 4), round(itn, 2)
+
     def calcular_fator_obstrucao(self, tipo_emissor, area_tubo, area_emissor):
         """
         Calcula o Índice de Obstrução (IO) e retorna o fator de perda de carga localizada (KL).
@@ -101,6 +151,42 @@ class CalculadorIrrigacao:
 
         tr_max = math.floor(irn_max_mm / (etc_mm_dia * sp_m * sr_m))
         return tr_max
+    def comprimento_trecho_a_trecho(self, diametro_m, vazao_emissor_m3s, espacamento_m, pressao_entrada_mca, declividade, hvar_max):
+        """
+        Calcula o comprimento máximo da linha lateral trecho a trecho (do último emissor para o primeiro).
+        """
+        pressao_ultimo_emissor = pressao_entrada_mca
+        pressao_anterior = pressao_ultimo_emissor
+        comprimento_total = 0.0
+        i = 1
+
+        area = math.pi * (diametro_m ** 2) / 4.0
+
+        while True:
+            vazao_acumulada_m3s = i * vazao_emissor_m3s
+            v = vazao_acumulada_m3s / area
+            r = (v * diametro_m) / 1.01e-6
+
+            if r < 2000:
+                f = 64 / r if r > 0 else 0
+            elif 2000 <= r < 3000:
+                f = 0.04
+            else:
+                f = 0.316 / (r ** 0.25)
+
+            hf = 8.263e-2 * f * (vazao_acumulada_m3s ** 2 / diametro_m ** 5) * espacamento_m
+
+            # Pressão no emissor atual = pressão do emissor anterior + perda de carga + desnível
+            pressao_atual = pressao_anterior + hf + (declividade * espacamento_m)
+
+            if abs(pressao_atual - pressao_ultimo_emissor) > hvar_max:
+                break
+
+            comprimento_total += espacamento_m
+            pressao_anterior = pressao_atual
+            i += 1
+
+        return comprimento_total
 
     def avaliar_status_solo(self, valor_umidade):
         if valor_umidade < self.umidade_critica:
@@ -111,3 +197,41 @@ class CalculadorIrrigacao:
             return {"status": "Ideal", "cor_alerta": "success", "irrigar": False, "mensagem": "Solo com umidade perfeita."}
         else:
             return {"status": "Encharcado", "cor_alerta": "info", "irrigar": False, "mensagem": "Solo muito úmido. Evite desperdiçar água."}
+
+    def classificar_perfil_pressao(self, So, k_linha, L_estimado):
+        """
+        Classifica o perfil de pressão hidráulica baseado na tese.
+        So: declividade em decimal
+        k_linha: constante da linha
+        L_estimado: comprimento estimado
+        """
+        if So <= 0:
+            return 'Perfil Tipo I (Aclive ou Nível)'
+
+        J = k_linha * (L_estimado ** 1.75)
+        razao = So / J
+
+        if 0 < razao < 1:
+            return 'Perfil Tipo IIa (Declive Fraco)'
+        elif razao == 1:
+            return 'Perfil Tipo IIb (Declive Moderado)'
+        elif 1 < razao < 2.75:
+            return 'Perfil Tipo IIc (Declive Forte)'
+        else:
+            return 'Perfil Tipo IId (Declive Muito Forte)'
+    def perda_conector_lateral(self, diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms):
+        """
+        Calcula a Perda Localizada de Carga por conexão de entrada em MCA.
+        Equação 77 da Tese (modelo de Vilaça).
+        """
+        hfl_l = 2.268121 * (diametro_conector_m ** 0.106) * (comprimento_conector_m ** 1.057) * (vel_conector_ms ** 1.766) * (vel_lateral_ms ** 0.386)
+        return hfl_l
+
+    def calcular_pressao_inicial_bomba(self, pressao_emissor, perda_carga_tubulacao, diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms):
+        """
+        Método principal de perda de carga:
+        Calcula a pressão inicial necessária da bomba adicionando a perda de carga localizada (Hfl_l).
+        """
+        hfl_l = self.perda_conector_lateral(diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms)
+        pressao_inicial = pressao_emissor + perda_carga_tubulacao + hfl_l
+        return pressao_inicial

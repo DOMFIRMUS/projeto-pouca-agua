@@ -47,6 +47,26 @@ def test_status_get(client):
     assert 'status_solo' in data
     assert 'turno_rega_max_dias' in data
     assert isinstance(data['turno_rega_max_dias'], int)
+    assert 'lamina_bruta_irrigacao_mm' in data
+    assert 'metricas_tese' in data
+    assert 'fracao_lixiviacao' in data['metricas_tese']
+    assert 'irrigacao_total_necessaria_mm' in data['metricas_tese']
+
+def test_status_get_blaney_criddle(client):
+    client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})
+    response = client.get('/api/status?metodo_eto=blaney-criddle')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data['umidade_atual'] == 40.0
+    assert 'status_solo' in data
+
+def test_status_get_blaney_criddle(client):
+    client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})
+    response = client.get('/api/status?metodo_eto=blaney-criddle')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data['umidade_atual'] == 40.0
+    assert 'status_solo' in data
 
 def test_status_get_blaney_criddle(client):
     client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})
@@ -66,3 +86,35 @@ def test_historico_get(client):
     assert len(data) == 2
     assert data[0]['umidade'] == 45.0
     assert data[1]['umidade'] == 40.0
+
+def test_hidraulica_post_success(client):
+    response = client.post('/api/hidraulica', json={
+        'So': 0.5,
+        'k_linha': 1.0,
+        'L_estimado': 1.0
+    })
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'classificacao' in data
+    assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
+
+def test_hidraulica_post_missing_fields(client):
+    response = client.post('/api/hidraulica', json={
+        'So': 0.5,
+        'k_linha': 1.0
+    })
+    assert response.status_code == 400
+    data = json.loads(response.data)
+    assert 'erro' in data
+    assert "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios." in data['erro']
+
+def test_hidraulica_post_invalid_type(client):
+    response = client.post('/api/hidraulica', json={
+        'So': 'abc',
+        'k_linha': 1.0,
+        'L_estimado': 1.0
+    })
+    assert response.status_code == 400
+    data = json.loads(response.data)
+    assert 'erro' in data
+    assert "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos." in data['erro']
