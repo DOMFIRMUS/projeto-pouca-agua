@@ -56,6 +56,14 @@ def test_calcular_irn_e_cad():
     assert cad == 60.0
     assert irn_max == 30.0
 
+def test_calcular_itn():
+    calc = CalculadorIrrigacao()
+    # irn_mm = 30, ce_agua_ds_m = 1.0, ce_solo_min = 1.0, ce_solo_max = 2.0, uniformidade_emissao_decimal = 0.90
+    # FL = 1.0 / (2 * 2.0) = 0.25
+    # ITN = 30 / ((1 - 0.25) * 1.0 * 0.90) = 30 / (0.75 * 0.9) = 30 / 0.675 = 44.444...
+    fl, itn = calc.calcular_itn(30, 1.0, 1.0, 2.0, 0.90)
+    assert fl == 0.25
+    assert itn == 44.44
 def test_calcular_fator_obstrucao():
     calc = CalculadorIrrigacao()
 
