@@ -454,3 +454,30 @@ class CalculadorIrrigacao:
         hfl_l = self.perda_conector_lateral(diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms)
         pressao_inicial = pressao_emissor + perda_carga_tubulacao + hfl_l
         return pressao_inicial
+
+    def calcular_raio_umedecido(self, alpha, q, ko, se=None):
+        """
+        Calcula o Raio Umedecido (Rw) para faixa contínua baseado na Equação 26.
+        """
+        if alpha <= 0 or ko <= 0:
+            return {"rw": 0.0}
+
+        termo1 = 4 / ((alpha ** 2) * (math.pi ** 2))
+        termo2 = q / (math.pi * ko)
+        termo3 = 2 / (alpha * math.pi)
+
+        valor_interno = termo1 + termo2 - termo3
+
+        if valor_interno < 0:
+            return {"rw": 0.0}
+
+        rw = math.sqrt(valor_interno)
+        rw_arredondado = round(rw, 2)
+
+        resultado = {"rw": rw_arredondado}
+
+        if se is not None:
+            if se > 2 * rw_arredondado:
+                resultado["alerta"] = "a faixa contínua será rompida"
+
+        return resultado
