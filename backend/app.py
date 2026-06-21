@@ -22,6 +22,8 @@ dados_sistema = {
     "profundidade_raiz_m": 0.40,    # Raiz do cultivo atual (0.4 metros)
     "fator_deplecao_f": 0.50,       # Fator f da tabela 6 da tese
     "porcentagem_umedecida_pw": 50.0, # Gotejamento cobre 50% da área
+    "espacamento_plantas_m": 0.5,   # Espaçamento entre plantas na fileira
+    "espacamento_fileiras_m": 1.0   # Espaçamento entre fileiras
     "ce_solo_min": 1.0,             # Condutividade elétrica mínima do solo suportada (dS/m) - padrão
     "ce_solo_max": 3.0,             # Condutividade elétrica máxima tolerada pela cultura (dS/m)
     "uniformidade_emissao_decimal": 0.90 # Uniformidade de emissão do gotejador (90%)
@@ -64,6 +66,13 @@ def obter_status():
         dados_sistema["porcentagem_umedecida_pw"]
     )
 
+    # Cálculo do Turno de Rega Máximo (TR_max)
+    # Assumindo etc_mm_dia aproximadamente igual a eto para simplificação (Kc = 1.0)
+    turno_rega_max_dias = calculador.calcular_turno_rega_max(
+        irn_max_mm=irn_max,
+        etc_mm_dia=eto,
+        sp_m=dados_sistema["espacamento_plantas_m"],
+        sr_m=dados_sistema["espacamento_fileiras_m"]
     # Verifica se foi enviada a condutividade elétrica da água via query params
     ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
 
@@ -95,6 +104,7 @@ def obter_status():
         "cor_alerta": analise["cor_alerta"],
         "mensagem_acao": analise["mensagem"],
         "precisa_irrigar": analise["irrigar"],
+        "turno_rega_max_dias": turno_rega_max_dias,
         "lamina_bruta_irrigacao_mm": itn,
         "metricas_tese": {
             "evapotranspiracao_referencia_mm_dia": eto,

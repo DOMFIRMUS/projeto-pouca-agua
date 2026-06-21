@@ -160,6 +160,17 @@ def test_calcular_perda_carga_total():
     # Test D = 0
     hf_zero = calc.calcular_perda_carga_total(0.02, 100, 0.0, 1.5, 'online', 200, 20)
     assert hf_zero == 0.0
+
+def test_calcular_turno_rega_max():
+    calc = CalculadorIrrigacao()
+    # irn_max_mm=13.0, etc_mm_dia=5.0, sp_m=0.5, sr_m=1.0
+    # TR_max = floor(13.0 / (5.0 * 0.5 * 1.0)) = floor(13.0 / 2.5) = floor(5.2) = 5
+    tr_max = calc.calcular_turno_rega_max(13.0, 5.0, 0.5, 1.0)
+    assert tr_max == 5
+
+    # Caso com valores zerados para etc_mm_dia, sp_m ou sr_m
+    tr_max_zero = calc.calcular_turno_rega_max(13.0, 0, 0.5, 1.0)
+    assert tr_max_zero == 0
 def test_comprimento_trecho_a_trecho():
     calc = CalculadorIrrigacao()
     # Parâmetros de teste: diametro_m=0.016, vazao_emissor_m3s=5.5e-7 (aprox 2L/h)

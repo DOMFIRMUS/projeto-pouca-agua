@@ -1,4 +1,3 @@
-# backend/models/irrigacao.py
 import math
 
 class CalculadorIrrigacao:
@@ -142,6 +141,16 @@ class CalculadorIrrigacao:
         hf = (f_tubo + kl) * (comprimento / diametro) * (velocidade ** 2) / (2 * 9.81)
 
         return round(hf, 4)
+
+    def calcular_turno_rega_max(self, irn_max_mm, etc_mm_dia, sp_m, sr_m):
+        """
+        Calcula o Turno de Rega Máximo (TR_max) baseado na Equação 44 da tese.
+        """
+        if etc_mm_dia <= 0 or sp_m <= 0 or sr_m <= 0:
+            return 0
+
+        tr_max = math.floor(irn_max_mm / (etc_mm_dia * sp_m * sr_m))
+        return tr_max
     def comprimento_trecho_a_trecho(self, diametro_m, vazao_emissor_m3s, espacamento_m, pressao_entrada_mca, declividade, hvar_max):
         """
         Calcula o comprimento máximo da linha lateral trecho a trecho (do último emissor para o primeiro).

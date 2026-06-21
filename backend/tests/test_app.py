@@ -45,6 +45,8 @@ def test_status_get(client):
     data = json.loads(response.data)
     assert data['umidade_atual'] == 40.0
     assert 'status_solo' in data
+    assert 'turno_rega_max_dias' in data
+    assert isinstance(data['turno_rega_max_dias'], int)
     assert 'lamina_bruta_irrigacao_mm' in data
     assert 'metricas_tese' in data
     assert 'fracao_lixiviacao' in data['metricas_tese']
