@@ -63,7 +63,8 @@ def obter_status():
         dados_sistema["solo_pmp"],
         dados_sistema["profundidade_raiz_m"],
         dados_sistema["fator_deplecao_f"],
-        dados_sistema["porcentagem_umedecida_pw"]
+        dados_sistema["porcentagem_umedecida_pw"],
+        etc_calculada=eto
     )
 
     # Cálculo do Turno de Rega Máximo (TR_max)

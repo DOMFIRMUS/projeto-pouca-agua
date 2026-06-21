@@ -47,14 +47,29 @@ def test_calcular_eto_hargreaves():
     assert isinstance(eto, float)
     assert eto > 0
 
+def test_corrigir_fator_deplecao():
+    calc = CalculadorIrrigacao()
+    # f_tabela = 0.5, etc = 3.0 -> f = 0.5 + 0.04 * (5 - 3) = 0.5 + 0.08 = 0.58
+    assert calc.corrigir_fator_deplecao(0.5, 3.0) == 0.58
+    # Testar limite superior: f_tabela = 0.8, etc = 1.0 -> f = 0.8 + 0.04 * 4 = 0.96 -> max(0.8)
+    assert calc.corrigir_fator_deplecao(0.8, 1.0) == 0.8
+    # Testar limite inferior: f_tabela = 0.2, etc = 8.0 -> f = 0.2 + 0.04 * -3 = 0.08 -> min(0.1)
+    assert calc.corrigir_fator_deplecao(0.2, 8.0) == 0.1
+
 def test_calcular_irn_e_cad():
     calc = CalculadorIrrigacao()
     # to_cc=0.3, to_pmp=0.15, z=0.4, f=0.5, fw_percent=100
     # cad = 1000 * (0.3 - 0.15) * 0.4 = 60
-    # irn_max = 60 * 0.5 * 1.0 = 30
+    # Sem etc_calculada: irn_max = 60 * 0.5 * 1.0 = 30
     cad, irn_max = calc.calcular_irn_e_cad(0.3, 0.15, 0.4, 0.5, 100)
     assert cad == 60.0
     assert irn_max == 30.0
+
+    # Com etc_calculada = 3.0: f_corrigido = 0.58
+    # irn_max = 60 * 0.58 * 1.0 = 34.8
+    cad_corr, irn_max_corr = calc.calcular_irn_e_cad(0.3, 0.15, 0.4, 0.5, 100, etc_calculada=3.0)
+    assert cad_corr == 60.0
+    assert irn_max_corr == 34.8
 
 def test_calcular_kl():
     calc = CalculadorIrrigacao()
