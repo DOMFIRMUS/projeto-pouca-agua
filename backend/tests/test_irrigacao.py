@@ -100,3 +100,9 @@ def test_calcular_perda_carga_total():
     # Test D = 0
     hf_zero = calc.calcular_perda_carga_total(0.02, 100, 0.0, 1.5, 'online', 200, 20)
     assert hf_zero == 0.0
+
+def test_calcular_tempo_irrigacao():
+    calc = CalculadorIrrigacao()
+    ti, np = calc.calcular_tempo_irrigacao(10.0, 0.5, 1.0, 50.0, 0.3, 2.0)
+    assert np == 4
+    assert ti == 0.625

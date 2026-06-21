@@ -21,7 +21,11 @@ dados_sistema = {
     "solo_pmp": 0.14,               # Ponto de murcha permanente m³/m³
     "profundidade_raiz_m": 0.40,    # Raiz do cultivo atual (0.4 metros)
     "fator_deplecao_f": 0.50,       # Fator f da tabela 6 da tese
-    "porcentagem_umedecida_pw": 50.0 # Gotejamento cobre 50% da área
+    "porcentagem_umedecida_pw": 50.0, # Gotejamento cobre 50% da área
+    "espacamento_plantas_sp": 0.5,
+    "espacamento_fileiras_sr": 1.0,
+    "dw_diametro_molhado": 0.3,
+    "vazao_emissor_qa": 2.0
 }
 
 @app.route('/api/status', methods=['GET'])
@@ -69,8 +73,19 @@ def obter_status():
         # Se precisa irrigar, estima lâmina proporcional ao défice atual
         defice_proporcional = (dados_sistema["solo_cc"] - (umidade_atual/100 * dados_sistema["solo_cc"]))
         tempo_estimado_minutos = round((defice_proporcional * irn_max * 60) / max(eto, 1), 1)
+        itn_mm = defice_proporcional * irn_max
     else:
         tempo_estimado_minutos = 0.0
+        itn_mm = 0.0
+
+    ti_horas, np_emissores = calculador.calcular_tempo_irrigacao(
+        itn_mm,
+        dados_sistema["espacamento_plantas_sp"],
+        dados_sistema["espacamento_fileiras_sr"],
+        dados_sistema["porcentagem_umedecida_pw"],
+        dados_sistema["dw_diametro_molhado"],
+        dados_sistema["vazao_emissor_qa"]
+    )
 
     # Atualiza o status e o tempo calculado no banco de dados
     update_leitura_status(leitura_id, analise["status"], max(tempo_estimado_minutos, 0.0))
@@ -85,7 +100,9 @@ def obter_status():
             "evapotranspiracao_referencia_mm_dia": eto,
             "capacidade_agua_disponivel_solo_mm": cad,
             "irrigacao_real_necessaria_max_mm": irn_max,
-            "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0)
+            "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
+            "tempo_irrigacao_horas": ti_horas,
+            "numero_emissores_por_planta": np_emissores
         }
     }), 200
 
