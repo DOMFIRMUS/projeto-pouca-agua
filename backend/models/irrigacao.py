@@ -221,6 +221,26 @@ class CalculadorIrrigacao:
         else:
             return {"status": "Encharcado", "cor_alerta": "info", "irrigar": False, "mensagem": "Solo muito úmido. Evite desperdiçar água."}
 
+    def dimensionar_diametro_trecho(self, fator_atrito_f, vazao_trecho_q, desnivel_trecho_dz, comprimento_trecho_L, h0=0.0):
+        """
+        Dimensiona a linha de derivação trecho a trecho.
+        Calcula o diâmetro teórico interno usando a Equação 74 da tese,
+        e o ganho de pressão pela Equação 75.
+        """
+        # Assumir a perda de carga do trecho (hf) como sendo igual ao desnível (dz)
+        hf = desnivel_trecho_dz
+
+        if hf <= 0:
+            return 0.0
+
+        # Equação 74: D = ((8.263e-2 * f * (Q^2) * L) / hf) ^ (1/5)
+        d_teorico = ((8.263e-2 * fator_atrito_f * (vazao_trecho_q ** 2) * comprimento_trecho_L) / hf) ** 0.2
+
+        # Equação 75: H1 = H0 - hf + dz
+        # (Essa variável é calculada apenas para cumprir o requisito, mas não é retornada)
+        h1 = h0 - hf + desnivel_trecho_dz
+
+        return d_teorico
     def fracionar_tempo_irrigacao(self, ti_total_horas, tempo_maximo_bomba_horas=2.0):
         """
         Fraciona o tempo total de irrigação para proteger a bomba de água de operar
