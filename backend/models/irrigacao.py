@@ -8,6 +8,17 @@ class CalculadorIrrigacao:
         self.umidade_ideal_min = 60.0
         self.umidade_ideal_max = 80.0
 
+    def calcular_eto_blaney_criddle(self, t_media, mes_index):
+        """
+        Calcula a Evapotranspiração de Referência (ETo em mm/dia) usando o método de Blaney-Criddle-FAO.
+        """
+        # Percentagem diária de horas anuais de luz solar para a Latitude 20 Sul
+        p_dict = {1: 25, 2: 26, 3: 27, 4: 28, 5: 29, 6: 30, 7: 30, 8: 29, 9: 28, 10: 26, 11: 25, 12: 25}
+
+        p = p_dict.get(mes_index, 25)
+        eto = (0.457 * t_media + 8.13) * (p / 100)
+        return round(eto, 2)
+
     def calcular_eto_hargreaves(self, t_max, t_min, latitude, mes_index):
         """
         Calcula a Evapotranspiração de Referência (ETo em mm/dia) usando a equação
@@ -67,6 +78,42 @@ class CalculadorIrrigacao:
 
         return round(fl, 4), round(itn, 2)
 
+    def calcular_fator_obstrucao(self, tipo_emissor, area_tubo, area_emissor):
+        """
+        Calcula o Índice de Obstrução (IO) e retorna o fator de perda de carga localizada (KL).
+        """
+        if area_tubo <= 0:
+            return 0.0
+
+        io = area_emissor / area_tubo
+        tipo_emissor = tipo_emissor.lower()
+
+        if tipo_emissor == 'online':
+            kl = 1.935 * (io ** 0.595)
+        elif tipo_emissor == 'pastilha':
+            kl = 1.383 * (io ** 0.576)
+        elif tipo_emissor == 'bobi':
+            kl = 1.230 * (io ** 0.510)
+        else:
+            kl = 0.0
+
+        return round(kl, 4)
+
+    def calcular_perda_carga_total(self, f_tubo, comprimento, diametro, velocidade, tipo_emissor, area_tubo, area_emissor):
+        """
+        Calcula a perda de carga total da linha lateral (hf) adicionando o fator de obstrução (KL)
+        ao fator de atrito 'f' do tubo.
+        """
+        if diametro <= 0:
+            return 0.0
+
+        kl = self.calcular_fator_obstrucao(tipo_emissor, area_tubo, area_emissor)
+
+        # hf = (f + KL) * (L / D) * (V^2 / 2g)
+        hf = (f_tubo + kl) * (comprimento / diametro) * (velocidade ** 2) / (2 * 9.81)
+
+        return round(hf, 4)
+
     def avaliar_status_solo(self, valor_umidade):
         if valor_umidade < self.umidade_critica:
             return {"status": "Crítico (Seco)", "cor_alerta": "danger", "irrigar": True, "mensagem": "Solo excessivamente seco. Ligue a irrigação."}
@@ -76,3 +123,20 @@ class CalculadorIrrigacao:
             return {"status": "Ideal", "cor_alerta": "success", "irrigar": False, "mensagem": "Solo com umidade perfeita."}
         else:
             return {"status": "Encharcado", "cor_alerta": "info", "irrigar": False, "mensagem": "Solo muito úmido. Evite desperdiçar água."}
+
+    def perda_conector_lateral(self, diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms):
+        """
+        Calcula a Perda Localizada de Carga por conexão de entrada em MCA.
+        Equação 77 da Tese (modelo de Vilaça).
+        """
+        hfl_l = 2.268121 * (diametro_conector_m ** 0.106) * (comprimento_conector_m ** 1.057) * (vel_conector_ms ** 1.766) * (vel_lateral_ms ** 0.386)
+        return hfl_l
+
+    def calcular_pressao_inicial_bomba(self, pressao_emissor, perda_carga_tubulacao, diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms):
+        """
+        Método principal de perda de carga:
+        Calcula a pressão inicial necessária da bomba adicionando a perda de carga localizada (Hfl_l).
+        """
+        hfl_l = self.perda_conector_lateral(diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms)
+        pressao_inicial = pressao_emissor + perda_carga_tubulacao + hfl_l
+        return pressao_inicial
