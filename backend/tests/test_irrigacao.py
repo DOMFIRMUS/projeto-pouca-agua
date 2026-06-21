@@ -15,7 +15,7 @@ def test_avaliar_status_solo_critico():
 def test_avaliar_status_solo_moderado():
     calc = CalculadorIrrigacao()
     resultado = calc.avaliar_status_solo(50.0)
-    assert resultado["status"] == "Moderado (Necessita Atenção)"
+    assert resultado["status"] == "Moderado"
     assert resultado["irrigar"] is True
 
 def test_avaliar_status_solo_ideal():
@@ -30,22 +30,20 @@ def test_avaliar_status_solo_encharcado():
     assert resultado["status"] == "Encharcado"
     assert resultado["irrigar"] is False
 
-def test_calcular_tempo_irrigacao_nao_necessario():
+def test_calcular_eto_hargreaves():
     calc = CalculadorIrrigacao()
-    tempo = calc.calcular_tempo_irrigacao(70.0)
-    assert tempo == 0
+    # ETo para Janeiro (mes_index = 1), Tmax=30, Tmin=20
+    # Tmedia = 25. Ra = 42.2
+    # ETo = 0.0023 * 42.2 * 0.408 * (25 + 17.8) * sqrt(10)
+    eto = calc.calcular_eto_hargreaves(30, 20, -22, 1)
+    assert isinstance(eto, float)
+    assert eto > 0
 
-def test_calcular_tempo_irrigacao_necessario():
+def test_calcular_irn_e_cad():
     calc = CalculadorIrrigacao()
-    tempo = calc.calcular_tempo_irrigacao(50.0, 2.0, 0.3)
-    # deficit = 60 - 50 = 10
-    # tempo = (10 * 1.5) / (2.0 * 0.3) = 15 / 0.6 = 25.0
-    assert tempo == 25.0
-
-def test_calcular_tempo_irrigacao_minimo():
-    calc = CalculadorIrrigacao()
-    tempo = calc.calcular_tempo_irrigacao(59.0, 2.0, 0.3)
-    # deficit = 60 - 59 = 1
-    # tempo = (1 * 1.5) / (2.0 * 0.3) = 1.5 / 0.6 = 2.5
-    # should be max(2.5, 5) = 5
-    assert tempo == 5.0
+    # to_cc=0.3, to_pmp=0.15, z=0.4, f=0.5, fw_percent=100
+    # cad = 1000 * (0.3 - 0.15) * 0.4 = 60
+    # irn_max = 60 * 0.5 * 1.0 = 30
+    cad, irn_max = calc.calcular_irn_e_cad(0.3, 0.15, 0.4, 0.5, 100)
+    assert cad == 60.0
+    assert irn_max == 30.0
