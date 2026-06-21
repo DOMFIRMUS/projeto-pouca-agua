@@ -161,6 +161,44 @@ def test_calcular_perda_carga_total():
     hf_zero = calc.calcular_perda_carga_total(0.02, 100, 0.0, 1.5, 'online', 200, 20)
     assert hf_zero == 0.0
 
+def test_calcular_area_sombreada():
+    calc = CalculadorIrrigacao()
+
+    # Test faixa continua
+    # Ps = (largura_faixa_ss / espacamento_fileiras_sr) * 100
+    # Ps = (1.5 / 3.0) * 100 = 50.0
+    ps_faixa = calc.calcular_area_sombreada('faixa_continua', espacamento_plantas_sp=0.5, espacamento_fileiras_sr=3.0, largura_faixa_ss=1.5)
+    assert ps_faixa == 50.0
+
+    # Test arvore isolada
+    # Ps = ((math.pi * (diametro_copa_dco ** 2) / 4) / (espacamento_fileiras_sr * espacamento_plantas_sp)) * 100
+    # DCO = 2.0, SR = 4.0, SP = 3.0
+    # Area copa = pi * 4 / 4 = pi = 3.14159...
+    # Area plantio = 12.0
+    # Ps = (3.14159... / 12) * 100 = 26.1799... -> 26.18
+    import math
+    ps_arvore = calc.calcular_area_sombreada('arvore_isolada', espacamento_plantas_sp=3.0, espacamento_fileiras_sr=4.0, diametro_copa_dco=2.0)
+    assert ps_arvore == 26.18
+
+    # Test edge case: invalid tipo
+    ps_invalid = calc.calcular_area_sombreada('unknown', 1.0, 1.0)
+    assert ps_invalid == 0.0
+
+    # Test edge case: zero espacamento_fileiras_sr
+    ps_zero_sr = calc.calcular_area_sombreada('faixa_continua', espacamento_plantas_sp=1.0, espacamento_fileiras_sr=0.0, largura_faixa_ss=1.0)
+    assert ps_zero_sr == 0.0
+
+    # Test edge case: missing largura_faixa_ss for faixa_continua
+    ps_missing_ss = calc.calcular_area_sombreada('faixa_continua', espacamento_plantas_sp=1.0, espacamento_fileiras_sr=1.0)
+    assert ps_missing_ss == 0.0
+
+    # Test edge case: missing diametro_copa_dco for arvore_isolada
+    ps_missing_dco = calc.calcular_area_sombreada('arvore_isolada', espacamento_plantas_sp=1.0, espacamento_fileiras_sr=1.0)
+    assert ps_missing_dco == 0.0
+
+    # Test edge case: zero espacamento_plantas_sp for arvore_isolada
+    ps_zero_sp = calc.calcular_area_sombreada('arvore_isolada', espacamento_plantas_sp=0.0, espacamento_fileiras_sr=1.0, diametro_copa_dco=1.0)
+    assert ps_zero_sp == 0.0
 def test_calcular_turno_rega_max():
     calc = CalculadorIrrigacao()
     # irn_max_mm=13.0, etc_mm_dia=5.0, sp_m=0.5, sr_m=1.0
