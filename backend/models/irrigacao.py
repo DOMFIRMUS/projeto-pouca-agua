@@ -454,3 +454,14 @@ class CalculadorIrrigacao:
         hfl_l = self.perda_conector_lateral(diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms)
         pressao_inicial = pressao_emissor + perda_carga_tubulacao + hfl_l
         return pressao_inicial
+
+    def calcular_rns(self, rs, ra, altitude_m):
+        """
+        Calcula a Radiação Solar de Céu Claro (Rso) e a Radiação Líquida de Onda Curta (Rns).
+        Equação 17: Rso = [0.75 + 2 * (Altitude / 100000)] * Ra
+        Equação 18: Rns = 0.77 * Rs
+        Mantém a unidade: MJ * m^-2 * d^-1
+        """
+        rso = (0.75 + 2 * (altitude_m / 100000)) * ra
+        rns = 0.77 * rs
+        return round(rso, 2), round(rns, 2)
