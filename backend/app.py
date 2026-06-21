@@ -36,12 +36,21 @@ def obter_status():
     leitura_id = ultima_leitura['id']
 
     # 1. Executa cálculos científicos baseados na Tese
-    eto = calculador.calcular_eto_hargreaves(
-        temperatura_max,
-        temperatura_min,
-        latitude=-22.0,
-        mes_index=dados_sistema["mes_atual"]
-    )
+    metodo_eto = request.args.get('metodo_eto', 'hargreaves')
+    t_media = (temperatura_max + temperatura_min) / 2
+
+    if metodo_eto.lower() == 'blaney-criddle':
+        eto = calculador.calcular_eto_blaney_criddle(
+            t_media,
+            mes_index=dados_sistema["mes_atual"]
+        )
+    else:
+        eto = calculador.calcular_eto_hargreaves(
+            temperatura_max,
+            temperatura_min,
+            latitude=-22.0,
+            mes_index=dados_sistema["mes_atual"]
+        )
 
     cad, irn_max = calculador.calcular_irn_e_cad(
         dados_sistema["solo_cc"],
