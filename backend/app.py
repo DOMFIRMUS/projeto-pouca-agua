@@ -3,7 +3,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from models.irrigacao import CalculadorIrrigacao
 import datetime
-from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico
+from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas
 
 app = Flask(__name__)
 CORS(app)
@@ -12,6 +12,7 @@ calculador = CalculadorIrrigacao()
 
 # Inicializa o banco de dados
 init_db()
+seed_culturas()
 
 # Variáveis do sistema para cálculos
 dados_sistema = {
@@ -110,6 +111,11 @@ def receber_dados_sensor():
 def obter_historico():
     historico = get_historico()
     return jsonify(historico), 200
+
+@app.route('/api/culturas', methods=['GET'])
+def obter_culturas():
+    culturas = get_culturas()
+    return jsonify(culturas), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
