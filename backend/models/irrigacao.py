@@ -417,6 +417,30 @@ class CalculadorIrrigacao:
             return round(ps, 2)
 
         return 0.0
+    def calcular_lmax_perfil_tipo_IId(self, H, Hvar, So, k_linha, L_inicial=50.0):
+        """
+        Calcula o comprimento máximo (L) para o Perfil Tipo II-d (Declive Muito Forte).
+        Valida a restrição de limite físico da Equação 66 e implementa a Equação 67 da tese iterativamente.
+        """
+        L_atual = L_inicial
+        iteracoes = 0
+        max_iteracoes = 1000
+
+        while iteracoes < max_iteracoes:
+            razao = So / (k_linha * (L_atual ** 1.75))
+            if razao < 2.75:
+                raise ValueError(f"Restrição de limite físico não atendida (Equação 66): S0 / (k' * L^1.75) = {razao:.4f} < 2.75. O ganho por desnível não supera totalmente a perda por atrito em todas as seções.")
+
+            L_novo = (H * Hvar) / ((So - k_linha * (L_atual ** 1.75)) * (1 - Hvar))
+
+            if abs(L_novo - L_atual) < 0.001:
+                return L_novo
+
+            L_atual = L_novo
+            iteracoes += 1
+
+        raise ValueError("A iteração para calcular L não convergiu após 1000 passos.")
+
     def classificar_perfil_pressao(self, So, k_linha, L_estimado):
         """
         Classifica o perfil de pressão hidráulica baseado na tese.

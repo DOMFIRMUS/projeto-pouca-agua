@@ -123,4 +123,19 @@ def test_hidraulica_post_invalid_type(client):
     assert response.status_code == 400
     data = json.loads(response.data)
     assert 'erro' in data
-    assert "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos." in data['erro']
+    assert "Os valores do fluxo avançado devem ser numéricos." in data['erro']
+
+def test_hidraulica_post_perfil_iid(client):
+    response = client.post('/api/hidraulica', json={
+        'So': 0.05,
+        'k_linha': 0.000001,
+        'L_estimado': 50.0,
+        'H': 10.0,
+        'Hvar': 0.2
+    })
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'classificacao' in data
+    assert data['classificacao'] == 'Perfil Tipo IId (Declive Muito Forte)'
+    assert 'L_max' in data
+    assert data['L_max'] == 50.99
