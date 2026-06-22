@@ -95,6 +95,7 @@ def test_historico_get(client):
 
 def test_hidraulica_post_perfil_success(client):
 def test_hidraulica_post_success(client):
+    response = client.post('/api/hidraulica_classificacao', json={
     payload = {
         "diametro_mm": 16,
         "vazao_gotejador_lh": 2,
@@ -121,6 +122,7 @@ def test_hidraulica_post_success(client):
 
 def test_hidraulica_post_perfil_missing_fields(client):
 def test_hidraulica_post_missing_fields(client):
+    response = client.post('/api/hidraulica_classificacao', json={
     payload = {
         "diametro_mm": 16
     }
@@ -182,6 +184,8 @@ def test_hidraulica_post_missing_fields(client):
     assert 'erro' in data
     assert "Parâmetros insuficientes" in data['erro']
 
+def test_hidraulica_post_invalid_type(client):
+    response = client.post('/api/hidraulica_classificacao', json={
 def test_hidraulica_post_perfil_invalid_type(client):
     response = client.post('/api/hidraulica', json={
 def test_hidraulica_post_invalid_type(client):
