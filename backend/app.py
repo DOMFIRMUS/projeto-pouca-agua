@@ -271,6 +271,11 @@ def obter_status():
             "evapotranspiracao_referencia_mm_dia": eto,
             "capacidade_agua_disponivel_solo_mm": cad,
             "irrigacao_real_necessaria_max_mm": irn_max,
+            "tempo_irrigacao_horas": ti_horas,
+            "numero_emissores_por_planta": np_emissores,
+            "fracao_lixiviacao": fl,
+            "irrigacao_total_necessaria_mm": itn,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
@@ -378,6 +383,8 @@ def perda_carga():
     if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
+    # Branch 1: Classification of pressure profile
+    if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
     # Ramo 1: Classificação de Perfil de Pressão
     if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
     # Branch 1: classificar_perfil_pressao
@@ -425,6 +432,11 @@ def perda_carga():
         classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
         return jsonify({"classificacao": classificacao}), 200
 
+    # Branch 2: Head loss calculation
+    campos_obrigatorios_perda_carga = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
+
+    # Check if we have the fields for head loss
+    if all(campo in dados for campo in campos_obrigatorios_perda_carga):
     # Ramo 2: Cálculo de Perda de Carga Distribuída
     campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
 
@@ -467,12 +479,27 @@ def perda_carga():
         except ValueError:
             return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
 
+        resultado = calculador.calcular_perda_carga(
         resultado_perda = calculador.calcular_perda_carga(
             diametro_mm,
             vazao_gotejador_lh,
             espacamento_m,
             comprimento_m
         )
+
+        if "erro" in resultado:
+            return jsonify(resultado), 400
+
+        return jsonify(resultado), 200
+
+    # If neither branch condition is fully met, check if we are missing fields for profile classification
+    if any(campo in dados for campo in ['So', 'k_linha', 'L_estimado']):
+         return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+
+    # Fallback to missing fields for head loss
+    for campo in campos_obrigatorios_perda_carga:
+        if campo not in dados:
+            return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
 
     missing_fields = [campo for campo in campos_obrigatorios if campo not in dados]
     if missing_fields:
