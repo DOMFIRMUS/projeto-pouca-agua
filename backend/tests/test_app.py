@@ -112,7 +112,7 @@ def test_hidraulica_post_missing_fields(client):
     assert response.status_code == 400
     data = json.loads(response.data)
     assert 'erro' in data
-    assert "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios." in data['erro']
+    assert "Parâmetros insuficientes" in data['erro']
 
 def test_hidraulica_post_invalid_type(client):
     response = client.post('/api/classificar_perfil', json={

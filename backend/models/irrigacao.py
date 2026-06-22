@@ -310,6 +310,34 @@ class CalculadorIrrigacao:
 
         return comprimento_total
 
+    def verificar_limite_salinidade(self, ce_agua_i, cultura_nome):
+        """
+        Filtro de proteção contra salinização do solo baseado na diretriz de manejo (pág 26 da tese).
+        Busca os limites min_ce e max_ce da cultura e verifica: CE_i <= (max_ce + min_ce) / 2
+        """
+        import sys
+        import os
+        sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+        from database import get_db_connection
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT min_ce, max_ce FROM culturas WHERE nome = ?", (cultura_nome,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            min_ce = row['min_ce']
+            max_ce = row['max_ce']
+            limite = (max_ce + min_ce) / 2.0
+            if ce_agua_i > limite:
+                return {
+                    "salinidade_critica": True,
+                    "alerta_manejo": "A salinidade da água ultrapassa a média de resiliência da cultura. Risco iminente de perda de produção."
+                }
+        return {"salinidade_critica": False}
+
     def avaliar_status_solo(self, valor_umidade):
         if valor_umidade < self.umidade_critica:
             return {"status": "Crítico (Seco)", "cor_alerta": "danger", "irrigar": True, "mensagem": "Solo excessivamente seco. Ligue a irrigação."}
