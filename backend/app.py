@@ -141,7 +141,15 @@ def obter_status():
     # Atualiza o status e o tempo calculado no banco de dados
     update_leitura_status(leitura_id, analise["status"], tempo_irrigacao_calculado_minutos)
 
-    return jsonify({
+    # Raio Umedecido Check
+    se = request.args.get('se', request.args.get('espacamento_m', dados_sistema.get("espacamento_plantas_sp", 0.5)), type=float)
+    q = request.args.get('q', dados_sistema.get("vazao_emissor_qa", 2.0), type=float)
+    ko = request.args.get('ko', 15.0, type=float) # Default condutividade if not given
+    alpha = request.args.get('alpha', 1.0, type=float) # Default alpha if not given
+
+    raio_umedecido_info = calculador.calcular_raio_umedecido(alpha, q, ko, se)
+
+    response_json = {
         "umidade_atual": umidade_atual,
         "status_solo": analise["status"],
         "cor_alerta": analise["cor_alerta"],
@@ -163,7 +171,13 @@ def obter_status():
             "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn
         }
-    }), 200
+    }
+
+    if raio_umedecido_info.get("alerta_faixa_descontinua"):
+        response_json["alerta_faixa_descontinua"] = True
+        response_json["mensagem_faixa"] = "Afastamento excessivo entre gotejadores. A faixa contínua de humidade será rompida, prejudicando as raízes."
+
+    return jsonify(response_json), 200
 
 @app.route('/api/sensor', methods=['POST'])
 def receber_dados_sensor():
@@ -235,6 +249,7 @@ def obter_culturas():
     return jsonify(culturas), 200
 
 @app.route('/api/classificar_perfil', methods=['POST'])
+def obter_hidraulica():
 def classificar_perfil():
     dados_recebidos = request.get_json()
     if not dados_recebidos or 'So' not in dados_recebidos or 'k_linha' not in dados_recebidos or 'L_estimado' not in dados_recebidos:
@@ -290,6 +305,8 @@ def processar_hidraulica():
         return jsonify({"erro": "Nenhum parâmetro válido enviado."}), 400
 
     return jsonify(resultado_final), 200
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
