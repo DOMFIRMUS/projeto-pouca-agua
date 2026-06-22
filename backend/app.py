@@ -274,6 +274,7 @@ def obter_status():
             "irrigacao_real_necessaria_max_mm": irn_max,
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn,
@@ -415,6 +416,8 @@ def obter_hidraulica():
     if not dados_recebidos:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
+    if 'So' in dados:
+        if 'k_linha' not in dados or 'L_estimado' not in dados:
     if 'So' in dados_recebidos and 'k_linha' in dados_recebidos and 'L_estimado' in dados_recebidos:
         try:
             So = float(dados_recebidos['So'])
@@ -465,6 +468,11 @@ def obter_hidraulica():
             L_estimado = float(dados['L_estimado'])
         except ValueError:
             return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+
+        classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+        return jsonify({"classificacao": classificacao}), 200
+
+    else:
 
         classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
         return jsonify({"classificacao": classificacao}), 200
@@ -914,6 +922,7 @@ def processar_hidraulica():
         for campo in campos_obrigatorios:
             if campo not in dados:
                 return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
+
         try:
             diametro_mm = float(dados['diametro_mm'])
             vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
@@ -928,6 +937,11 @@ def processar_hidraulica():
             espacamento_m,
             comprimento_m
         )
+
+        if "erro" in resultado:
+            return jsonify(resultado), 400
+
+        return jsonify(resultado), 200
 
         if "erro" in resultado:
             return jsonify(resultado), 400
