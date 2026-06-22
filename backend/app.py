@@ -273,6 +273,8 @@ def obter_status():
             "irrigacao_real_necessaria_max_mm": irn_max,
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
@@ -365,6 +367,15 @@ def perda_carga():
     if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
+    resultado_final = {}
+
+    tem_dados_basicos = all(campo in dados for campo in ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m'])
+    tem_dados_topograficos = all(campo in dados for campo in ['So', 'k_linha', 'L_estimado'])
+
+    if not tem_dados_basicos and not tem_dados_topograficos:
+        return jsonify({"erro": "Dados insuficientes. Envie os parâmetros básicos (diametro_mm, vazao_gotejador_lh, espacamento_m, comprimento_m) e/ou topográficos (So, k_linha, L_estimado)."}), 400
+
+    if tem_dados_basicos:
     tem_perfil = any(k in dados for k in ['So', 'k_linha', 'L_estimado', 'declividade', 'H', 'Hvar'])
     tem_perda = any(k in dados for k in ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m'])
 
@@ -560,6 +571,7 @@ def processar_hidraulica():
             espacamento_m = float(dados['espacamento_m'])
             comprimento_m = float(dados['comprimento_m'])
 
+            resultado_basico = calculador.calcular_perda_carga(
             resultado = calculador.calcular_perda_carga(
                 diametro_mm,
                 vazao_gotejador_lh,
@@ -567,6 +579,14 @@ def processar_hidraulica():
                 comprimento_m
             )
 
+            if "erro" in resultado_basico:
+                return jsonify(resultado_basico), 400
+
+            resultado_final.update(resultado_basico)
+        except ValueError:
+            return jsonify({"erro": "Todos os parâmetros básicos devem ser números válidos."}), 400
+
+    if tem_dados_topograficos:
             if "erro" in resultado:
                 erro_ocorrido = True
                 mensagem_erro = resultado["erro"]
@@ -668,6 +688,13 @@ def processar_hidraulica():
             So = float(dados['So'])
             k_linha = float(dados['k_linha'])
             L_estimado = float(dados['L_estimado'])
+
+            classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+            resultado_final["classificacao"] = classificacao
+        except ValueError:
+            return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+
+    return jsonify(resultado_final), 200
         except ValueError:
             return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
 

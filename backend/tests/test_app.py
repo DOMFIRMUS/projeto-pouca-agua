@@ -182,6 +182,7 @@ def test_hidraulica_post_missing_fields(client):
     assert response.status_code == 400
     data = json.loads(response.data)
     assert 'erro' in data
+    assert "Dados insuficientes" in data['erro']
     assert "Parâmetros insuficientes" in data['erro']
 
 def test_hidraulica_post_invalid_type(client):
@@ -202,6 +203,15 @@ def test_hidraulica_post_invalid_type(client):
     assert 'erro' in data
     assert "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos." in data['erro']
 
+def test_hidraulica_post_combined(client):
+    response = client.post('/api/hidraulica', json={
+        'diametro_mm': 16,
+        'vazao_gotejador_lh': 2,
+        'espacamento_m': 0.5,
+        'comprimento_m': 50,
+        'So': 0.5,
+        'k_linha': 1.0,
+        'L_estimado': 1.0
 def test_hidraulica_post_both_success(client):
 def test_status_get_salinidade_alerta(client):
     client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})
