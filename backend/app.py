@@ -276,6 +276,8 @@ def obter_status():
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
@@ -420,6 +422,24 @@ def obter_hidraulica():
     dados_recebidos = request.get_json()
     if not dados_recebidos:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
+
+    # Branch logic based on the incoming JSON payload parameters
+    if any(k in dados for k in ['So', 'k_linha', 'L_estimado']):
+        if not ('So' in dados and 'k_linha' in dados and 'L_estimado' in dados):
+            return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+
+        try:
+            So = float(dados['So'])
+            k_linha = float(dados['k_linha'])
+            L_estimado = float(dados['L_estimado'])
+        except ValueError:
+            return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+
+        classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+        return jsonify({"classificacao": classificacao}), 200
+
+    else:
+        campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
 
     # Determina o fluxo de cálculo com base nos campos recebidos
     if 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
@@ -993,6 +1013,11 @@ def processar_hidraulica():
             espacamento_m,
             comprimento_m
         )
+
+        if "erro" in resultado:
+            return jsonify(resultado), 400
+
+        return jsonify(resultado), 200
 
         if "erro" in resultado:
             return jsonify(resultado), 400
