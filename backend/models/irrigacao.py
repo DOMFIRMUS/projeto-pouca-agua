@@ -454,3 +454,24 @@ class CalculadorIrrigacao:
         hfl_l = self.perda_conector_lateral(diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms)
         pressao_inicial = pressao_emissor + perda_carga_tubulacao + hfl_l
         return pressao_inicial
+
+    def validar_criterio_pressao_subunidade(self, perda_carga_total_hf, pressao_entrada_h):
+        """
+        Validador de uniformidade de descarga hidráulica na subunidade baseando-se
+        nas restrições de projeto da página 28 da tese.
+        """
+        if pressao_entrada_h <= 0:
+            return {"status_hidraulico": "ERRO", "classe": "Pressão de entrada deve ser maior que zero."}
+
+        hvar_real = (perda_carga_total_hf / pressao_entrada_h) * 100.0
+
+        if hvar_real <= 20.0:
+            return {
+                "status_hidraulico": "ACEITAVEL",
+                "classe": "Uniformidade de gotejamento excelente de acordo com os critérios do modelo computacional"
+            }
+        else:
+            return {
+                "status_hidraulico": "REJEITADO",
+                "classe": "Desuniformidade Elevada. A variação de pressão viola o limite máximo de 20% estabelecido na tese. Reduza o comprimento ou aumente o diâmetro do tubo."
+            }

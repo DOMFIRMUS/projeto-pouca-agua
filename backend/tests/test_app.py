@@ -94,7 +94,7 @@ def test_historico_get(client):
     assert data[1]['umidade'] == 40.0
 
 def test_hidraulica_post_success(client):
-    response = client.post('/api/hidraulica', json={
+    response = client.post('/api/classificar_perfil', json={
         'So': 0.5,
         'k_linha': 1.0,
         'L_estimado': 1.0
@@ -105,7 +105,7 @@ def test_hidraulica_post_success(client):
     assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
 
 def test_hidraulica_post_missing_fields(client):
-    response = client.post('/api/hidraulica', json={
+    response = client.post('/api/classificar_perfil', json={
         'So': 0.5,
         'k_linha': 1.0
     })
@@ -115,7 +115,7 @@ def test_hidraulica_post_missing_fields(client):
     assert "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios." in data['erro']
 
 def test_hidraulica_post_invalid_type(client):
-    response = client.post('/api/hidraulica', json={
+    response = client.post('/api/classificar_perfil', json={
         'So': 'abc',
         'k_linha': 1.0,
         'L_estimado': 1.0
