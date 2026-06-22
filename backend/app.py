@@ -279,6 +279,7 @@ def obter_status():
             "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
@@ -376,6 +377,8 @@ def perda_carga():
     if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
+    # Ramo 1: Classificação de Perfil de Pressão
+    if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
     # Branch 1: classificar_perfil_pressao
     if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
     resultado_final = {}
@@ -417,6 +420,19 @@ def perda_carga():
             L_estimado = float(dados['L_estimado'])
         except ValueError:
             return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+
+        classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+        return jsonify({"classificacao": classificacao}), 200
+
+    # Ramo 2: Cálculo de Perda de Carga Distribuída
+    campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
+
+    # Verifica se pelo menos o primeiro campo do ramo 2 está presente antes de assumir este caminho
+    if 'diametro_mm' in dados:
+        for campo in campos_obrigatorios:
+            if campo not in dados:
+                return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
+
 
         classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
         return jsonify({"classificacao": classificacao}), 200
@@ -582,6 +598,19 @@ def processar_hidraulica():
         except ValueError:
             return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
 
+        resultado = calculador.calcular_perda_carga(
+            diametro_mm,
+            vazao_gotejador_lh,
+            espacamento_m,
+            comprimento_m
+        )
+
+        if "erro" in resultado:
+            return jsonify(resultado), 400
+
+        return jsonify(resultado), 200
+
+    return jsonify({"erro": "Payload inválido. Envie os parâmetros para classificação de perfil ou perda de carga."}), 400
         resultado_basico = calculador.calcular_perda_carga(
             diametro_mm, vazao_gotejador_lh, espacamento_m, comprimento_m
         )
