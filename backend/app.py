@@ -27,6 +27,7 @@ dados_sistema = {
     "dw_diametro_molhado": 0.3,
     "vazao_emissor_qa": 2.0,
     "espacamento_plantas_m": 0.5,   # Espaçamento entre plantas na fileira
+    "espacamento_fileiras_m": 1.0,   # Espaçamento entre fileiras
     "espacamento_fileiras_m": 1.0,  # Espaçamento entre fileiras
     "ce_solo_min": 1.0,             # Condutividade elétrica mínima do solo suportada (dS/m) - padrão
     "ce_solo_max": 3.0,             # Condutividade elétrica máxima tolerada pela cultura (dS/m)
@@ -154,9 +155,10 @@ def obter_status():
             "evapotranspiracao_referencia_mm_dia": eto,
             "capacidade_agua_disponivel_solo_mm": cad,
             "irrigacao_real_necessaria_max_mm": irn_max,
-            "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
+            "fracao_lixiviacao": fl,
+            "irrigacao_total_necessaria_mm": itn,
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn
@@ -195,6 +197,38 @@ def obter_historico():
     historico = get_historico()
     return jsonify(historico), 200
 
+@app.route('/api/perda_carga', methods=['POST'])
+def perda_carga():
+    dados = request.get_json()
+
+    if not dados:
+        return jsonify({"erro": "Nenhum dado enviado"}), 400
+
+    campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
+
+    for campo in campos_obrigatorios:
+        if campo not in dados:
+            return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
+
+    try:
+        diametro_mm = float(dados['diametro_mm'])
+        vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
+        espacamento_m = float(dados['espacamento_m'])
+        comprimento_m = float(dados['comprimento_m'])
+    except ValueError:
+        return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
+
+    resultado = calculador.calcular_perda_carga(
+        diametro_mm,
+        vazao_gotejador_lh,
+        espacamento_m,
+        comprimento_m
+    )
+
+    if "erro" in resultado:
+        return jsonify(resultado), 400
+
+    return jsonify(resultado), 200
 @app.route('/api/culturas', methods=['GET'])
 def obter_culturas():
     culturas = get_culturas()
