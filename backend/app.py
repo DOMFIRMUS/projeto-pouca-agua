@@ -3,6 +3,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from models.irrigacao import CalculadorIrrigacao
 import datetime
+from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, insert_projeto_metadados, get_projeto_metadados
 from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_bancos, insert_banco, delete_banco
 from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, insert_projeto
 
@@ -416,6 +417,7 @@ def obter_hidraulica():
     if not dados_recebidos:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
+    if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
     if 'So' in dados:
         if 'k_linha' not in dados or 'L_estimado' not in dados:
     if 'So' in dados_recebidos and 'k_linha' in dados_recebidos and 'L_estimado' in dados_recebidos:
@@ -468,6 +470,11 @@ def obter_hidraulica():
             L_estimado = float(dados['L_estimado'])
         except ValueError:
             return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+        classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+        return jsonify({"classificacao": classificacao}), 200
+    elif 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
+         return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+
 
         classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
         return jsonify({"classificacao": classificacao}), 200
@@ -620,6 +627,35 @@ def obter_hidraulica():
     resultado.update(validacao)
 
     return jsonify(resultado), 200
+
+@app.route('/api/projetos', methods=['POST'])
+def salvar_projeto_metadados():
+    dados = request.get_json()
+    if not dados:
+        return jsonify({"erro": "Nenhum dado enviado"}), 400
+
+    campos_obrigatorios = ['codigo_projeto', 'nome_projeto', 'largura', 'altura', 'profundidade']
+    for campo in campos_obrigatorios:
+        if campo not in dados:
+            return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
+
+    sucesso = insert_projeto_metadados(
+        dados['codigo_projeto'],
+        dados['nome_projeto'],
+        int(dados['largura']),
+        int(dados['altura']),
+        int(dados['profundidade'])
+    )
+
+    if sucesso:
+        return jsonify({"status": "sucesso", "mensagem": "Projeto salvo com sucesso"}), 201
+    else:
+        return jsonify({"erro": "O código do projeto já existe (restrição de unicidade)."}), 409
+
+@app.route('/api/culturas', methods=['GET'])
+def obter_culturas():
+    culturas = get_culturas()
+    return jsonify(culturas), 200
 
 @app.route('/api/culturas', methods=['GET'])
 def obter_culturas():
