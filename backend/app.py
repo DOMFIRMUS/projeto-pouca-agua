@@ -25,9 +25,9 @@ dados_sistema = {
     "espacamento_plantas_sp": 0.5,
     "espacamento_fileiras_sr": 1.0,
     "dw_diametro_molhado": 0.3,
-    "vazao_emissor_qa": 2.0
+    "vazao_emissor_qa": 2.0,
     "espacamento_plantas_m": 0.5,   # Espaçamento entre plantas na fileira
-    "espacamento_fileiras_m": 1.0   # Espaçamento entre fileiras
+    "espacamento_fileiras_m": 1.0,  # Espaçamento entre fileiras
     "ce_solo_min": 1.0,             # Condutividade elétrica mínima do solo suportada (dS/m) - padrão
     "ce_solo_max": 3.0,             # Condutividade elétrica máxima tolerada pela cultura (dS/m)
     "uniformidade_emissao_decimal": 0.90 # Uniformidade de emissão do gotejador (90%)
@@ -96,6 +96,7 @@ def obter_status():
         etc_mm_dia=eto,
         sp_m=dados_sistema["espacamento_plantas_m"],
         sr_m=dados_sistema["espacamento_fileiras_m"]
+    )
     # Verifica se foi enviada a condutividade elétrica da água via query params
     ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
 
@@ -153,13 +154,11 @@ def obter_status():
             "evapotranspiracao_referencia_mm_dia": eto,
             "capacidade_agua_disponivel_solo_mm": cad,
             "irrigacao_real_necessaria_max_mm": irn_max,
-            "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
             "tempo_irrigacao_horas": ti_horas,
-            "numero_emissores_por_planta": np_emissores
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos
+            "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn,
-            "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0)
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos
         }
     }), 200
 
@@ -195,6 +194,11 @@ def obter_historico():
     historico = get_historico()
     return jsonify(historico), 200
 
+@app.route('/api/culturas', methods=['GET'])
+def obter_culturas():
+    culturas = get_culturas()
+    return jsonify(culturas), 200
+
 @app.route('/api/hidraulica', methods=['POST'])
 def hidraulica():
     dados = request.get_json()
@@ -202,52 +206,51 @@ def hidraulica():
     if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
-    campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
+    # Branch 1: Classification of pressure profile
+    if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
+        try:
+            So = float(dados['So'])
+            k_linha = float(dados['k_linha'])
+            L_estimado = float(dados['L_estimado'])
+        except ValueError:
+            return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
 
-    for campo in campos_obrigatorios:
+        classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+        return jsonify({"classificacao": classificacao}), 200
+
+    # Branch 2: Head loss calculation
+    campos_obrigatorios_perda_carga = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
+
+    # Check if we have the fields for head loss
+    if all(campo in dados for campo in campos_obrigatorios_perda_carga):
+        try:
+            diametro_mm = float(dados['diametro_mm'])
+            vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
+            espacamento_m = float(dados['espacamento_m'])
+            comprimento_m = float(dados['comprimento_m'])
+        except ValueError:
+            return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
+
+        resultado = calculador.calcular_perda_carga(
+            diametro_mm,
+            vazao_gotejador_lh,
+            espacamento_m,
+            comprimento_m
+        )
+
+        if "erro" in resultado:
+            return jsonify(resultado), 400
+
+        return jsonify(resultado), 200
+
+    # If neither branch condition is fully met, check if we are missing fields for profile classification
+    if any(campo in dados for campo in ['So', 'k_linha', 'L_estimado']):
+         return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+
+    # Fallback to missing fields for head loss
+    for campo in campos_obrigatorios_perda_carga:
         if campo not in dados:
             return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
-
-    try:
-        diametro_mm = float(dados['diametro_mm'])
-        vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
-        espacamento_m = float(dados['espacamento_m'])
-        comprimento_m = float(dados['comprimento_m'])
-    except ValueError:
-        return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
-
-    resultado = calculador.calcular_perda_carga(
-        diametro_mm,
-        vazao_gotejador_lh,
-        espacamento_m,
-        comprimento_m
-    )
-
-    if "erro" in resultado:
-        return jsonify(resultado), 400
-
-    return jsonify(resultado), 200
-@app.route('/api/culturas', methods=['GET'])
-def obter_culturas():
-    culturas = get_culturas()
-    return jsonify(culturas), 200
-
-@app.route('/api/hidraulica', methods=['POST'])
-def obter_hidraulica():
-    dados_recebidos = request.get_json()
-    if not dados_recebidos or 'So' not in dados_recebidos or 'k_linha' not in dados_recebidos or 'L_estimado' not in dados_recebidos:
-        return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
-
-    try:
-        So = float(dados_recebidos['So'])
-        k_linha = float(dados_recebidos['k_linha'])
-        L_estimado = float(dados_recebidos['L_estimado'])
-    except ValueError:
-        return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
-
-    classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
-
-    return jsonify({"classificacao": classificacao}), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
