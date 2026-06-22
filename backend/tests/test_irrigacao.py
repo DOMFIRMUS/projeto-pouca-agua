@@ -363,6 +363,14 @@ def test_comprimento_trecho_a_trecho():
     assert isinstance(comprimento, float)
     assert comprimento > 0.0
 
+def test_calcular_lmax_perfil_tipo_I():
+    calc = CalculadorIrrigacao()
+    # Test values
+    # H = 10.0, Hvar = 2.0, So = 1.0, k_linha = 0.001
+    L_max = calc.calcular_lmax_perfil_tipo_I(10.0, 2.0, 1.0, 0.001)
+    assert isinstance(L_max, float)
+    assert L_max > 0.0
+
 def test_perda_conector_lateral():
     calc = CalculadorIrrigacao()
     # Valores de exemplo: diam=0.016, comp=0.05, vel_con=1.5, vel_lat=1.0
@@ -385,3 +393,47 @@ def test_calcular_pressao_inicial_bomba():
     pressao = calc.calcular_pressao_inicial_bomba(10.0, 2.0, 0.016, 0.05, 1.5, 1.0)
     assert isinstance(pressao, float)
     assert round(pressao, 3) == 12.126
+
+def test_calcular_raio_umedecido():
+    calc = CalculadorIrrigacao()
+    import math
+
+    alpha = 1.2
+    q = 4.0
+    ko = 10.0
+
+    # R_w = sqrt(4/(alpha^2 * pi^2) + q/(pi * ko) - 2/(alpha * pi))
+    # R_w = sqrt(4/(1.44 * pi^2) + 4.0/(pi * 10.0) - 2/(1.2 * pi))
+    # termo1 = 4 / (1.44 * 9.8696) = 4 / 14.2122 = 0.2814
+    # termo2 = 4.0 / 31.4159 = 0.1273
+    # termo3 = 2 / 3.7699 = 0.5305
+    # valor_interno = 0.2814 + 0.1273 - 0.5305 = -0.1218
+    # Since valor_interno < 0, it should return 0.0
+
+    res1 = calc.calcular_raio_umedecido(alpha, q, ko)
+    assert res1["rw"] == 0.0
+
+    # Try with values that yield positive value
+    # Let's increase q and decrease alpha
+    alpha2 = 0.5
+    q2 = 50.0
+    ko2 = 2.0
+    # termo1 = 4 / (0.25 * 9.8696) = 1.6211
+    # termo2 = 50.0 / (3.14159 * 2.0) = 7.9577
+    # termo3 = 2 / (0.5 * 3.14159) = 1.2732
+    # valor_interno = 1.6211 + 7.9577 - 1.2732 = 8.3056
+    # rw = sqrt(8.3056) = 2.88
+
+    res2 = calc.calcular_raio_umedecido(alpha2, q2, ko2)
+    assert res2["rw"] == 2.88
+
+    # Test alert logic
+    # rw = 2.88, 2*rw = 5.76
+
+    # No alert, se = 5.0 <= 5.76
+    res3 = calc.calcular_raio_umedecido(alpha2, q2, ko2, se=5.0)
+    assert "alerta" not in res3
+
+    # Alert, se = 6.0 > 5.76
+    res4 = calc.calcular_raio_umedecido(alpha2, q2, ko2, se=6.0)
+    assert res4["alerta"] == "a faixa contínua será rompida"
