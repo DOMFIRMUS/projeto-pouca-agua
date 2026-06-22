@@ -273,6 +273,8 @@ def obter_status():
             "irrigacao_real_necessaria_max_mm": irn_max,
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn,
             "deficit_pressao_vapor_kpa": deficit_pressao_vapor_kpa
@@ -418,6 +420,7 @@ def perda_carga():
         vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
         espacamento_m = float(dados['espacamento_m'])
         comprimento_m = float(dados['comprimento_m'])
+        comprimento_equivalente_le = float(dados.get('comprimento_equivalente_le', 0.0))
         pressao_entrada_mca = float(dados.get('pressao_entrada_mca', 10.0))
     except ValueError:
         return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
@@ -426,7 +429,8 @@ def perda_carga():
         diametro_mm,
         vazao_gotejador_lh,
         espacamento_m,
-        comprimento_m
+        comprimento_m,
+        comprimento_equivalente_le
     )
 
     if "erro" in resultado:
@@ -447,6 +451,7 @@ def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
 
+@app.route('/api/hidraulica/perfil', methods=['POST'])
 @app.route('/api/hidraulica_perfil', methods=['POST'])
 @app.route('/api/classificar_hidraulica', methods=['POST'])
 

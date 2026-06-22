@@ -94,6 +94,7 @@ def test_historico_get(client):
     assert data[1]['umidade'] == 40.0
 
 def test_hidraulica_post_success(client):
+    response = client.post('/api/hidraulica/perfil', json={
     response = client.post('/api/hidraulica_perfil', json={
     response = client.post('/api/classificar_hidraulica', json={
 def test_hidraulica_post_success_advanced(client):
@@ -110,6 +111,7 @@ def test_hidraulica_post_success(client):
     assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
 
 def test_hidraulica_post_missing_fields(client):
+    response = client.post('/api/hidraulica/perfil', json={
     response = client.post('/api/hidraulica_perfil', json={
     response = client.post('/api/classificar_perfil', json={
     response = client.post('/api/classificar_hidraulica', json={
@@ -150,6 +152,7 @@ def test_hidraulica_post_missing_fields(client):
     assert "Parâmetros insuficientes" in data['erro']
 
 def test_hidraulica_post_invalid_type(client):
+    response = client.post('/api/hidraulica/perfil', json={
     response = client.post('/api/hidraulica_perfil', json={
     response = client.post('/api/classificar_hidraulica', json={
     response = client.post('/api/classificar_perfil', json={

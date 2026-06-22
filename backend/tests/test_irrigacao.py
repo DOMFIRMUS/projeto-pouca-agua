@@ -67,11 +67,18 @@ def test_calcular_irn_e_cad():
 
 def test_calcular_perda_carga():
     calc = CalculadorIrrigacao()
-    # Test valid input
+    # Test valid input sem comprimento equivalente (lambda = 1.0)
     resultado = calc.calcular_perda_carga(16, 2, 0.5, 50)
     assert resultado["vazao_total_lh"] == 200.0
     assert "perda_carga_mca" in resultado
+    assert resultado["perda_carga_mca"] == 0.063
     assert resultado["status"] in ["Aceitável", "Desuniformidade Elevada"]
+    assert resultado["fator_lambda"] == 1.0
+
+    # Test valid input com comprimento equivalente (ex: Le = 0.25 -> lambda = (0.25+0.5)/0.5 = 1.5)
+    resultado_le = calc.calcular_perda_carga(16, 2, 0.5, 50, 0.25)
+    assert resultado_le["fator_lambda"] == 1.5
+    assert resultado_le["perda_carga_mca"] == 0.095
 
     # Test invalid input (espacamento <= 0)
     resultado_erro1 = calc.calcular_perda_carga(16, 2, 0, 50)

@@ -362,10 +362,20 @@ class CalculadorIrrigacao:
         else:
             return {"status": "Encharcado", "cor_alerta": "info", "irrigar": False, "mensagem": "Solo muito úmido. Evite desperdiçar água."}
 
-    def calcular_perda_carga(self, diametro_mm, vazao_gotejador_lh, espacamento_m, comprimento_m):
+    def calcular_lambda(self, comprimento_equivalente_le, espacamento_emissores_se):
+        """
+        Calcula o fator de comprimento equivalente (lambda) para perdas localizadas.
+        Equação 51: lambda = (Le + Se) / Se
+        """
+        if espacamento_emissores_se <= 0:
+            return 1.0 # fallback caso espaçamento seja zero ou negativo
+        return (comprimento_equivalente_le + espacamento_emissores_se) / espacamento_emissores_se
+
+    def calcular_perda_carga(self, diametro_mm, vazao_gotejador_lh, espacamento_m, comprimento_m, comprimento_equivalente_le=0.0):
         """
         Calcula a perda de carga em uma linha lateral de gotejamento usando a equação
-        empírica para tubos plásticos pequenos (Flamant/Blasius) e aplica o fator de Christiansen.
+        empírica para tubos plásticos pequenos (Flamant/Blasius) com fator de comprimento equivalente (lambda)
+        e aplica o fator de Christiansen.
         """
         if espacamento_m <= 0:
             return {"erro": "Espaçamento deve ser maior que zero"}
@@ -386,9 +396,11 @@ class CalculadorIrrigacao:
         # Equação de Flamant/Blasius para plásticos pequenos: m = 1.75
         m = 1.75
 
-        # Equação empírica de perda de carga para tubo contínuo (hf)
-        # J = 0.000859 * Q^1.75 * D^-4.75
-        hf_continua = 0.000859 * comprimento_m * (q_m3s ** 1.75) * (d_m ** -4.75)
+        fator_lambda = self.calcular_lambda(comprimento_equivalente_le, espacamento_m)
+
+        # Equação empírica de perda de carga para tubo contínuo (hf) com fator lambda
+        # hf_continua = 2.8287e-4 * Q^1.75 * D^-4.75 * L * lambda
+        hf_continua = 2.8287e-4 * (q_m3s ** 1.75) * (d_m ** -4.75) * comprimento_m * fator_lambda
 
         # Fator de Christiansen para múltiplas saídas
         fator_f = (1 / (m + 1)) + (1 / (2 * n_emissores)) + (math.sqrt(m - 1) / (6 * n_emissores**2))
@@ -401,7 +413,8 @@ class CalculadorIrrigacao:
         return {
             "vazao_total_lh": round(vazao_total_lh, 2),
             "perda_carga_mca": round(hf_mca, 3),
-            "status": status
+            "status": status,
+            "fator_lambda": round(fator_lambda, 4)
         }
     def obter_kc_atual(self, data_plantio, dias_fases, kc_valores):
         """
