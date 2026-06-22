@@ -683,6 +683,46 @@ class CalculadorIrrigacao:
             iteracoes += 1
 
         raise ValueError("A iteração para calcular L não convergiu após 1000 passos.")
+
+    def calcular_porcentagem_area_sombreada_ps(self, tipo_calculo, params):
+        if tipo_calculo not in ['faixa_sombreada', 'diametro_copa']:
+            raise ValueError('Método de cálculo de área sombreada inválido ou dados insuficientes.')
+
+        ps = 0.0
+
+        if tipo_calculo == 'faixa_sombreada':
+            ss_largura = params.get('ss_largura')
+            sr_espacamento = params.get('sr_espacamento')
+
+            if ss_largura is None or sr_espacamento is None:
+                raise ValueError('Método de cálculo de área sombreada inválido ou dados insuficientes.')
+
+            if sr_espacamento <= 0:
+                return 0.0
+
+            # Equação 28
+            ps = (ss_largura / sr_espacamento) * 100.0
+
+        elif tipo_calculo == 'diametro_copa':
+            dco_diametro = params.get('dco_diametro')
+            sr_espacamento = params.get('sr_espacamento')
+            sp_espacamento = params.get('sp_espacamento')
+
+            if dco_diametro is None or sr_espacamento is None or sp_espacamento is None:
+                raise ValueError('Método de cálculo de área sombreada inválido ou dados insuficientes.')
+
+            if sr_espacamento <= 0 or sp_espacamento <= 0:
+                return 0.0
+
+            # Equação 29
+            area_copa = math.pi * ((dco_diametro ** 2) / 4.0)
+            area_plantio = sr_espacamento * sp_espacamento
+            ps = (area_copa / area_plantio) * 100.0
+
+        # Normalização limitando o teto matemático a 100.0 e arredondando para 2 casas
+        ps = min(ps, 100.0)
+        return round(ps, 2)
+
     def classificar_perfil_pressao(self, So, k_linha, L_estimado):
         """
         Classifica o perfil de pressão hidráulica baseado na tese.

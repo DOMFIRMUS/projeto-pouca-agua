@@ -12,7 +12,7 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-                CREATE TABLE IF NOT EXISTS historico_leitura (
+        CREATE TABLE IF NOT EXISTS historico_leitura (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             codigo_projeto TEXT,
             umidade REAL,
@@ -32,10 +32,7 @@ def init_db():
     columns = [info[1] for info in cursor.fetchall()]
     if 'codigo_projeto' not in columns:
         cursor.execute('ALTER TABLE historico_leitura ADD COLUMN codigo_projeto TEXT')
-    cursor.execute("PRAGMA table_info(historico_leitura)")
-    columns = [info[1] for info in cursor.fetchall()]
-    if 'codigo_projeto' not in columns:
-        cursor.execute('ALTER TABLE historico_leitura ADD COLUMN codigo_projeto TEXT')
+
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS culturas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,6 +48,16 @@ def init_db():
             max_ce REAL DEFAULT 3.0
         )
     ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS bancos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            taxa_mensal REAL NOT NULL
+        )
+    ''')
+
+    # Unified projetos_metadados schema incorporating all fields and the new audit fields for Ps
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS projetos_metadados (
             codigo_projeto TEXT PRIMARY KEY UNIQUE,
@@ -61,45 +68,38 @@ def init_db():
             codigo_subunidade TEXT,
             area_total_irrigada REAL,
             area_subunidade REAL,
-            data_elaboracao TEXT
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS projetos_metadados (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            codigo_projeto TEXT UNIQUE NOT NULL,
-            nome_projeto TEXT,
-            nome_propriedade TEXT,
-            nome_proprietario TEXT,
-            nome_projetista TEXT,
+            data_elaboracao TEXT,
             identificacao TEXT,
             nome_codigo_subunidade TEXT,
-            area_total_irrigada REAL,
-            area_subunidade REAL,
-            data_elaboracao TEXT
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS bancos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            taxa_mensal REAL NOT NULL
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS projetos_metadados (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            codigo_projeto TEXT UNIQUE NOT NULL,
-            nome_projeto TEXT,
             largura INTEGER,
             altura INTEGER,
-            profundidade INTEGER
+            profundidade INTEGER,
+            tipo_calculo_ps TEXT CHECK(tipo_calculo_ps IN ('faixa_sombreada', 'diametro_copa', NULL)),
+            ss_largura_faixa REAL,
+            dco_diametro_copa REAL,
+            ps_calculado REAL
         )
     ''')
+
+    # Try to add missing columns in case the table already exists
+    cursor.execute("PRAGMA table_info(projetos_metadados)")
+    columns = [info[1] for info in cursor.fetchall()]
+    novas_colunas = {
+        'tipo_calculo_ps': 'TEXT CHECK(tipo_calculo_ps IN (\'faixa_sombreada\', \'diametro_copa\', NULL))',
+        'ss_largura_faixa': 'REAL',
+        'dco_diametro_copa': 'REAL',
+        'ps_calculado': 'REAL'
+    }
+    for col, tipo in novas_colunas.items():
+        if col not in columns:
+            try:
+                cursor.execute(f'ALTER TABLE projetos_metadados ADD COLUMN {col} {tipo}')
+            except Exception as e:
+                pass
+
     conn.commit()
     conn.close()
 
-def insert_projeto(codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao):
 def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, profundidade):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -175,27 +175,18 @@ def seed_culturas():
         ('Trigo (Primavera)', 0.30, 1.15, 0.25, '2023-07-01', 20, 35, 30, 1.0, 3.0)
     ]
 
+
+    cursor.execute('SELECT COUNT(*) FROM culturas')
+    count = cursor.fetchone()[0]
+
     if count == 0:
-        culturas = [
-            ('Algodoeiro', 0.35, 1.20, 0.60, '2023-10-01', 30, 50, 40, 7.7, 27.0),
-            ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.7, 10.0),
-            ('Tomate', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 2.5, 12.5),
-            ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.3, 4.0),
-            ('Cebola', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.2, 7.2),
-            ('Tomate tutorado', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 1.0, 3.0),
-            ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.0, 3.0),
-            ('Batata', 0.50, 1.15, 0.75, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-            ('Cebola seca', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.0, 3.0),
-            ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.0, 3.0),
-            ('Melancia', 0.40, 1.00, 0.75, '2023-09-05', 20, 30, 20, 1.0, 3.0)
-        ]
-        cursor.executemany('''
-    for cultura in culturas:
-        cursor.execute('''
-            INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce)
-            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-            WHERE NOT EXISTS (SELECT 1 FROM culturas WHERE nome = ?)
-        ''', cultura + (cultura[0],))
+        for cultura in culturas:
+            cursor.execute('''
+                INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce)
+                SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                WHERE NOT EXISTS (SELECT 1 FROM culturas WHERE nome = ?)
+            ''', cultura + (cultura[0],))
+
 
     conn.commit()
     conn.close()
@@ -309,6 +300,39 @@ def get_historico():
     conn.close()
     return [dict(row) for row in rows]
 
+
+
+
+
+def salvar_dados_area_sombreada(codigo_projeto, tipo_calculo, ss_largura, dco_diametro, ps_calculado):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # First, check if the project exists
+    cursor.execute('SELECT 1 FROM projetos_metadados WHERE codigo_projeto = ?', (codigo_projeto,))
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        return False
+
+    try:
+        cursor.execute('''
+            UPDATE projetos_metadados
+            SET tipo_calculo_ps = ?,
+                ss_largura_faixa = ?,
+                dco_diametro_copa = ?,
+                ps_calculado = ?
+            WHERE codigo_projeto = ?
+        ''', (tipo_calculo, ss_largura, dco_diametro, ps_calculado, codigo_projeto))
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        print(f"Database error in salvar_dados_area_sombreada: {e}")
+        return False
+    finally:
+        conn.close()
+
 def obter_projeto_por_codigo(codigo_projeto):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -333,26 +357,29 @@ def obter_resumo_hidraulico(codigo_projeto):
         return dict(row)
     return None
 
-def obter_projeto_por_codigo(codigo_projeto):
+def insert_projeto(dados):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM projetos_metadados WHERE codigo_projeto = ?', (codigo_projeto,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return dict(row)
-    return None
-
-def obter_resumo_hidraulico(codigo_projeto):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT * FROM historico_leitura
-        WHERE codigo_projeto = ?
-        ORDER BY id DESC LIMIT 1
-    ''', (codigo_projeto,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return dict(row)
-    return None
+    try:
+        cursor.execute('''
+            INSERT INTO projetos_metadados (
+                codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario,
+                nome_projetista, codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            dados.get('codigo_projeto'),
+            dados.get('nome_projeto'),
+            dados.get('nome_propriedade'),
+            dados.get('nome_proprietario'),
+            dados.get('nome_projetista'),
+            dados.get('codigo_subunidade'),
+            dados.get('area_total_irrigada'),
+            dados.get('area_subunidade'),
+            dados.get('data_elaboracao')
+        ))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()

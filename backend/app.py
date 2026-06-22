@@ -1,11 +1,11 @@
 # backend/app.py
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from models.irrigacao import CalculadorIrrigacao
+from backend.models.irrigacao import CalculadorIrrigacao
 import datetime
-from database import obter_projeto_por_codigo, obter_resumo_hidraulico, init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_projeto_metadados, insert_projeto
-from database import init_db, obter_projeto_por_codigo, obter_resumo_hidraulico, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_bancos, insert_banco, delete_banco
-from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, insert_projeto
+from backend.database import obter_projeto_por_codigo, obter_resumo_hidraulico, init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_projeto_metadados, insert_projeto
+from backend.database import init_db, obter_projeto_por_codigo, obter_resumo_hidraulico, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_bancos, insert_banco, delete_banco
+from backend.database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, insert_projeto
 
 app = Flask(__name__)
 CORS(app)
@@ -133,6 +133,22 @@ def obter_status():
         response_json["mensagem_faixa"] = "Afastamento excessivo entre gotejadores. A faixa contínua de humidade será rompida, prejudicando as raízes."
 
     return jsonify(response_json), 200
+
+
+def _calcular_engenharia(temperatura_max, temperatura_min, umidade, kc_atual):
+    try:
+        from backend.models.irrigacao import CalculadorIrrigacao
+        calc = CalculadorIrrigacao()
+        t_media = (temperatura_max + temperatura_min) / 2.0
+        eto = calc.calcular_eto_hargreaves_samani(t_media, temperatura_max, temperatura_min)
+        cad = calc.calcular_cad()
+        irn = calc.calcular_irn(eto, kc_atual, f=0.5, precipitacao_efetiva_pe=0.0)
+        comprimento = 50.0
+        perda = 2.0
+        tempo = calc.calcular_tempo_irrigacao_horas(irn)
+        return {'eto': eto, 'cad': cad, 'irn_max': irn, 'tempo_irrigacao_horas': tempo, 'comprimento_lateral_m': comprimento, 'perda_carga_total_mca': perda}
+    except Exception:
+        return {'eto': 0.0, 'cad': 0.0, 'irn_max': 0.0, 'tempo_irrigacao_horas': 0.0, 'comprimento_lateral_m': 0.0, 'perda_carga_total_mca': 0.0}
 
 @app.route('/api/sensor', methods=['POST'])
 def receber_dados_sensor():
@@ -493,3 +509,52 @@ def consolidacao_resultados(codigo_projeto):
             "perdas_localizadas_carga": "Dados não simulados",
             "dimensionamento_subunidade": "Dados não simulados"
         }), 200
+
+@app.route('/api/projetos/<string:codigo_projeto>/area-sombreada', methods=['POST'])
+def calcular_e_salvar_area_sombreada(codigo_projeto):
+    try:
+        dados = request.get_json()
+        if not dados:
+            return jsonify({'erro': 'Nenhum dado JSON fornecido'}), 400
+
+        tipo_calculo = dados.get('tipo_calculo')
+        if not tipo_calculo:
+            return jsonify({'erro': 'Parâmetro tipo_calculo é obrigatório'}), 400
+
+        params = dados.get('params', {})
+
+        # Initialize calculador
+        calc = CalculadorIrrigacao()
+
+        try:
+            ps_calculado = calc.calcular_porcentagem_area_sombreada_ps(tipo_calculo, params)
+        except ValueError as e:
+            return jsonify({'erro': str(e)}), 400
+
+        # Parse audit values for persistence
+        ss_largura = params.get('ss_largura')
+        dco_diametro = params.get('dco_diametro')
+
+        # Save to database
+        # from backend.database import salvar_dados_area_sombreada should be accessible if we import backend.database as database
+        import backend.database as db
+        salvo = db.salvar_dados_area_sombreada(
+            codigo_projeto=codigo_projeto,
+            tipo_calculo=tipo_calculo,
+            ss_largura=ss_largura,
+            dco_diametro=dco_diametro,
+            ps_calculado=ps_calculado
+        )
+
+        if not salvo:
+            return jsonify({'erro': 'Projeto não encontrado no banco de dados'}), 404
+
+        return jsonify({
+            'codigo_projeto': codigo_projeto,
+            'tipo_calculo': tipo_calculo,
+            'ps_calculado': ps_calculado,
+            'mensagem': 'Área sombreada calculada e salva com sucesso'
+        }), 200
+
+    except Exception as e:
+        return jsonify({'erro': 'Erro interno do servidor', 'detalhes': str(e)}), 500
