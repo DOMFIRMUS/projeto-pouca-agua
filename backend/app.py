@@ -25,9 +25,9 @@ dados_sistema = {
     "espacamento_plantas_sp": 0.5,
     "espacamento_fileiras_sr": 1.0,
     "dw_diametro_molhado": 0.3,
-    "vazao_emissor_qa": 2.0
+    "vazao_emissor_qa": 2.0,
     "espacamento_plantas_m": 0.5,   # Espaçamento entre plantas na fileira
-    "espacamento_fileiras_m": 1.0   # Espaçamento entre fileiras
+    "espacamento_fileiras_m": 1.0,   # Espaçamento entre fileiras
     "ce_solo_min": 1.0,             # Condutividade elétrica mínima do solo suportada (dS/m) - padrão
     "ce_solo_max": 3.0,             # Condutividade elétrica máxima tolerada pela cultura (dS/m)
     "uniformidade_emissao_decimal": 0.90 # Uniformidade de emissão do gotejador (90%)
@@ -96,6 +96,7 @@ def obter_status():
         etc_mm_dia=eto,
         sp_m=dados_sistema["espacamento_plantas_m"],
         sr_m=dados_sistema["espacamento_fileiras_m"]
+    )
     # Verifica se foi enviada a condutividade elétrica da água via query params
     ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
 
@@ -139,7 +140,15 @@ def obter_status():
     # Atualiza o status e o tempo calculado no banco de dados
     update_leitura_status(leitura_id, analise["status"], tempo_irrigacao_calculado_minutos)
 
-    return jsonify({
+    # Raio Umedecido Check
+    se = request.args.get('se', request.args.get('espacamento_m', dados_sistema.get("espacamento_plantas_sp", 0.5)), type=float)
+    q = request.args.get('q', dados_sistema.get("vazao_emissor_qa", 2.0), type=float)
+    ko = request.args.get('ko', 15.0, type=float) # Default condutividade if not given
+    alpha = request.args.get('alpha', 1.0, type=float) # Default alpha if not given
+
+    raio_umedecido_info = calculador.calcular_raio_umedecido(alpha, q, ko, se)
+
+    response_json = {
         "umidade_atual": umidade_atual,
         "status_solo": analise["status"],
         "cor_alerta": analise["cor_alerta"],
@@ -155,13 +164,17 @@ def obter_status():
             "irrigacao_real_necessaria_max_mm": irn_max,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
             "tempo_irrigacao_horas": ti_horas,
-            "numero_emissores_por_planta": np_emissores
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos
+            "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn,
-            "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0)
         }
-    }), 200
+    }
+
+    if raio_umedecido_info.get("alerta_faixa_descontinua"):
+        response_json["alerta_faixa_descontinua"] = True
+        response_json["mensagem_faixa"] = "Afastamento excessivo entre gotejadores. A faixa contínua de humidade será rompida, prejudicando as raízes."
+
+    return jsonify(response_json), 200
 
 @app.route('/api/sensor', methods=['POST'])
 def receber_dados_sensor():
@@ -232,7 +245,7 @@ def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
 
-@app.route('/api/hidraulica', methods=['POST'])
+@app.route('/api/classificar_perfil', methods=['POST'])
 def obter_hidraulica():
     dados_recebidos = request.get_json()
     if not dados_recebidos or 'So' not in dados_recebidos or 'k_linha' not in dados_recebidos or 'L_estimado' not in dados_recebidos:
@@ -248,6 +261,8 @@ def obter_hidraulica():
     classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
 
     return jsonify({"classificacao": classificacao}), 200
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

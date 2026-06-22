@@ -454,3 +454,36 @@ class CalculadorIrrigacao:
         hfl_l = self.perda_conector_lateral(diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms)
         pressao_inicial = pressao_emissor + perda_carga_tubulacao + hfl_l
         return pressao_inicial
+
+    def calcular_raio_umedecido(self, alpha, q, ko, se):
+        """
+        Calcula o raio umedecido (Rw) pela Equação 26 e verifica se a faixa contínua é rompida.
+        """
+        import math
+
+        if alpha <= 0 or ko <= 0:
+            return {"erro": "Alpha e Ko devem ser maiores que zero."}
+
+        term1 = 4 / ((alpha**2) * (math.pi**2))
+        term2 = q / (math.pi * ko)
+        term3 = 2 / (alpha * math.pi)
+
+        inside_sqrt = term1 + term2 - term3
+
+        if inside_sqrt < 0:
+            return {"erro": "Valores resultam em raiz quadrada negativa."}
+
+        rw = math.sqrt(inside_sqrt)
+
+        alerta = False
+        mensagem = ""
+
+        if se > (2 * rw):
+            alerta = True
+            mensagem = "Afastamento excessivo entre gotejadores. A faixa contínua de humidade será rompida, prejudicando as raízes."
+
+        return {
+            "rw": round(rw, 4),
+            "alerta_faixa_descontinua": alerta,
+            "mensagem": mensagem
+        }
