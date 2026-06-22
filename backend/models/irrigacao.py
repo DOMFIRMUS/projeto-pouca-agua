@@ -506,6 +506,23 @@ class CalculadorIrrigacao:
         else:
             return 'Perfil Tipo IId (Declive Muito Forte)'
 
+    def calcular_lmax_perfil_tipo_IIb(self, H, Hvar, So, k_linha, L_estimado):
+        """
+        Calcula o Comprimento Máximo da Linha Lateral para Perfil Tipo II-b.
+        Verifica a condição de ocorrência do Perfil Tipo II-b pela Equação 62 da tese: (k' * L^1.75) / So = 1
+        E aplica a Equação 63 se a condição for atendida.
+        """
+        if So <= 0:
+            return None
+
+        razao = (k_linha * (L_estimado ** 1.75)) / So
+
+        if math.isclose(razao, 1.0, rel_tol=1e-4, abs_tol=1e-4):
+            # Equação 63: L = (H * Hvar) / (0.357 * So)
+            L = (H * Hvar) / (0.357 * So)
+            return L
+
+        return None
     def orquestrar_dimensionamento_declive(self, H, Hvar, So, k_linha):
         """
         Orquestrador de busca de perfis hidráulicos segundo a página 37 da tese.

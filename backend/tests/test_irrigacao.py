@@ -138,6 +138,32 @@ def test_classificar_perfil_pressao():
     assert calc.classificar_perfil_pressao(3.0, 1, 1) == 'Perfil Tipo IId (Declive Muito Forte)'
     assert calc.classificar_perfil_pressao(2.75, 1, 1) == 'Perfil Tipo IId (Declive Muito Forte)'
 
+def test_calcular_lmax_perfil_tipo_IIb():
+    calc = CalculadorIrrigacao()
+
+    # Test condition met: razao = 1.0 -> (k_linha * (L_estimado ** 1.75)) / So = 1
+    # Let L_estimado = 1, k_linha = 1, So = 1
+    # H = 10, Hvar = 2
+    # Result: L = (10 * 2) / (0.357 * 1) = 20 / 0.357 ~= 56.0224
+    result = calc.calcular_lmax_perfil_tipo_IIb(10, 2, 1, 1, 1)
+    assert result is not None
+    assert round(result, 4) == 56.0224
+
+    # Test condition met using float tolerance: razao = 1.00005
+    # So = 0.99995
+    result2 = calc.calcular_lmax_perfil_tipo_IIb(10, 2, 0.99995, 1, 1)
+    assert result2 is not None
+    assert round(result2, 4) == 56.0252
+
+    # Test condition not met: razao != 1
+    # So = 0.5 -> razao = 2.0
+    result3 = calc.calcular_lmax_perfil_tipo_IIb(10, 2, 0.5, 1, 1)
+    assert result3 is None
+
+    # Test condition So <= 0
+    result4 = calc.calcular_lmax_perfil_tipo_IIb(10, 2, 0, 1, 1)
+    assert result4 is None
+
 def test_calcular_itn():
     calc = CalculadorIrrigacao()
     # irn_mm = 30, ce_agua_ds_m = 1.0, ce_solo_min = 1.0, ce_solo_max = 2.0, uniformidade_emissao_decimal = 0.90
