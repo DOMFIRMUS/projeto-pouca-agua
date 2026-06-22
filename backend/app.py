@@ -271,6 +271,10 @@ def obter_status():
             "evapotranspiracao_referencia_mm_dia": eto,
             "capacidade_agua_disponivel_solo_mm": cad,
             "irrigacao_real_necessaria_max_mm": irn_max,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "tempo_irrigacao_horas": ti_horas,
+            "numero_emissores_por_planta": np_emissores,
+            "fracao_lixiviacao": fl,
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
@@ -354,10 +358,13 @@ def obter_historico():
     historico = get_historico()
     return jsonify(historico), 200
 
+
 @app.route('/api/culturas', methods=['GET'])
 def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
+
+
 
 @app.route('/api/hidraulica', methods=['POST'])
 def processar_hidraulica():
@@ -369,6 +376,8 @@ def perda_carga():
     if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
+    # Branch 1: classificar_perfil_pressao
+    if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
     resultado_final = {}
 
     tem_dados_basicos = all(campo in dados for campo in ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m'])
@@ -410,6 +419,9 @@ def perda_carga():
             return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
 
         classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+        return jsonify({"classificacao": classificacao}), 200
+
+    # Branch 2: calcular_perda_carga
 
         return jsonify({"classificacao": classificacao}), 200
 
@@ -445,6 +457,12 @@ def perda_carga():
             comprimento_m
         )
 
+    missing_fields = [campo for campo in campos_obrigatorios if campo not in dados]
+    if missing_fields:
+        if any(k in dados for k in ['So', 'k_linha', 'L_estimado']):
+            return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+        else:
+            return jsonify({"erro": f"O campo '{missing_fields[0]}' é obrigatório."}), 400
         if "erro" in resultado_perda:
             return jsonify(resultado_perda), 400
 
