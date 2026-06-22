@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Public Profile - Pouca Água</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="profile-page">
+    <header class="header">
+        <h1>Projeto Pouca Água</h1>
+        <p>Gestão de Irrigação</p>
+    </header>
+
+    <div class="profile-container">
+        <!-- Sidebar Navigation -->
+        <aside class="profile-sidebar">
+            <nav>
+                <ul class="sidebar-nav">
+                    <li class="nav-item active"><a href="#">Profile</a></li>
+                    <li class="nav-item"><a href="#">Account</a></li>
+                    <li class="nav-item"><a href="#">Appearance</a></li>
+                    <li class="nav-item"><a href="#">Accessibility</a></li>
+                    <li class="nav-item"><a href="#">Notifications</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="profile-content">
+            <div class="card account-details-card">
+                <div class="card-header">
+                    <h2>Account Details</h2>
+                </div>
+
+                <div class="card-body">
+                    <!-- Avatar Section -->
+                    <div class="avatar-section">
+                        <div class="avatar-img-container">
+                            <img src="https://via.placeholder.com/150" alt="Profile Avatar" class="avatar-img">
+                        </div>
+                        <div class="avatar-actions">
+                            <div class="avatar-buttons">
+                                <button type="button" class="btn btn-primary">Upload new photo</button>
+                                <button type="button" class="btn btn-secondary">Reset</button>
+                            </div>
+                            <p class="avatar-help">Allowed JPG, GIF or PNG. Max size of 800K</p>
+                        </div>
+                    </div>
+
+                    <hr class="divider">
+
+                    <!-- Form Section -->
+                    <form class="profile-form">
+                        <div class="form-group full-width">
+                            <label for="username">Username</label>
+                            <input type="text" id="username" name="username" value="johndoe" class="form-control">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group half-width">
+                                <label for="firstName">First name</label>
+                                <input type="text" id="firstName" name="firstName" value="John" class="form-control">
+                            </div>
+                            <div class="form-group half-width">
+                                <label for="lastName">Last name</label>
+                                <input type="text" id="lastName" name="lastName" value="Doe" class="form-control">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group half-width">
+                                <label for="organization">Organization</label>
+                                <input type="text" id="organization" name="organization" value="ThemeSelection" class="form-control">
+                            </div>
+                            <div class="form-group half-width">
+                                <label for="location">Location</label>
+                                <div class="select-wrapper">
+                                    <select id="location" name="location" class="form-control">
+                                        <option value="US" selected>US</option>
+                                        <option value="BR">Brazil</option>
+                                        <option value="UK">UK</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group half-width">
+                                <label for="email">Email address</label>
+                                <input type="email" id="email" name="email" value="john.doe@example.com" class="form-control">
+                            </div>
+                            <div class="form-group half-width">
+                                <label for="phone">Phone number</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">US (+1)</span>
+                                    <input type="text" id="phone" name="phone" value="202 555 0111" class="form-control">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group half-width">
+                            <label for="birthday">Birthday</label>
+                            <input type="text" id="birthday" name="birthday" value="September 29, 2023" class="form-control">
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Save changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

@@ -32,11 +32,24 @@ def test_avaliar_status_solo_encharcado():
 
 def test_calcular_eto_blaney_criddle():
     calc = CalculadorIrrigacao()
-    # t_media = 25, mes_index = 1
-    # P for Jan is 25
-    # ETo = (0.457 * 25 + 8.13) * (25 / 100) = (11.425 + 8.13) * 0.25 = 19.555 * 0.25 = 4.88875 -> 4.89
-    eto = calc.calcular_eto_blaney_criddle(25, 1)
-    assert eto == 4.89
+    # ETo para Lat 20 (Janeiro = 30%), t_media = 25
+    eto = calc.calcular_eto_blaney_criddle(25, 1, latitude_sul=20)
+    assert eto == 5.87
+
+    # Test Lat 60 Sul in December (40%), t_media = 25
+    eto2 = calc.calcular_eto_blaney_criddle(25, 12, latitude_sul=60)
+    # ETo = (0.457 * 25 + 8.13) * (40 / 100) = 19.555 * 0.40 = 7.822 -> 7.82
+    assert eto2 == 7.82
+
+def test_calcular_eto_penman_monteith():
+    calc = CalculadorIrrigacao()
+    # Testing with dummy values: rn=10, g=0, t_media=25, u2=2, es=3, ea=1.5, delta=0.5, gama=0.066
+    eto = calc.calcular_eto_penman_monteith(10, 0, 25, 2, 3, 1.5, 0.5, 0.066)
+    # Numerador_1 = 0.408 * 0.5 * 10 = 2.04
+    # Numerador_2 = 0.066 * (900 / 298) * 2 * 1.5 = 0.066 * 3.02013 * 3 = 0.59798
+    # Denominador = 0.5 + 0.066 * (1 + 0.68) = 0.5 + 0.11088 = 0.61088
+    # ETo = 2.63798 / 0.61088 = 4.318... -> 4.32
+    assert eto == 4.32
 
 def test_calcular_eto_hargreaves():
     calc = CalculadorIrrigacao()
