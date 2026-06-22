@@ -94,7 +94,11 @@ def test_historico_get(client):
     assert data[1]['umidade'] == 40.0
 
 def test_hidraulica_post_success(client):
+    response = client.post('/api/classificar_hidraulica', json={
+def test_hidraulica_post_success_advanced(client):
     response = client.post('/api/hidraulica', json={
+def test_hidraulica_post_success(client):
+    response = client.post('/api/classificar_perfil', json={
         'So': 0.5,
         'k_linha': 1.0,
         'L_estimado': 1.0
@@ -105,17 +109,47 @@ def test_hidraulica_post_success(client):
     assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
 
 def test_hidraulica_post_missing_fields(client):
+    response = client.post('/api/classificar_perfil', json={
+    response = client.post('/api/classificar_hidraulica', json={
+def test_hidraulica_post_success_basic(client):
     response = client.post('/api/hidraulica', json={
+        'diametro_mm': 16.0,
+        'vazao_gotejador_lh': 2.0,
+        'espacamento_m': 0.5,
+        'comprimento_m': 100.0
+    })
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'perda_carga_mca' in data
+
+def test_hidraulica_post_success_combined(client):
+    response = client.post('/api/hidraulica', json={
+        'So': 0.5,
+        'k_linha': 1.0,
+        'L_estimado': 1.0,
+        'diametro_mm': 16.0,
+        'vazao_gotejador_lh': 2.0,
+        'espacamento_m': 0.5,
+        'comprimento_m': 100.0
+    })
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'classificacao' in data
+    assert 'perda_carga_mca' in data
+
+def test_hidraulica_post_missing_fields(client):
+    response = client.post('/api/classificar_perfil', json={
         'So': 0.5,
         'k_linha': 1.0
     })
     assert response.status_code == 400
     data = json.loads(response.data)
     assert 'erro' in data
-    assert "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios." in data['erro']
+    assert "Parâmetros insuficientes" in data['erro']
 
 def test_hidraulica_post_invalid_type(client):
-    response = client.post('/api/hidraulica', json={
+    response = client.post('/api/classificar_hidraulica', json={
+    response = client.post('/api/classificar_perfil', json={
         'So': 'abc',
         'k_linha': 1.0,
         'L_estimado': 1.0
@@ -124,3 +158,39 @@ def test_hidraulica_post_invalid_type(client):
     data = json.loads(response.data)
     assert 'erro' in data
     assert "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos." in data['erro']
+
+def test_status_get_salinidade_alerta(client):
+    client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})
+    # Passing high CE to trigger warning
+    response = client.get('/api/status?ce_agua_ds_m=10.0')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'Alerta: Ocorrerá decréscimo na produtividade.' in data['mensagem_acao']
+def test_hidraulica_post_mixed_payload(client):
+    response = client.post('/api/hidraulica', json={
+        'So': 0.5,
+        'k_linha': 1.0,
+        'L_estimado': 1.0,
+        "diametro_mm": 16,
+        "vazao_gotejador_lh": 2,
+        "espacamento_m": 0.5,
+        "comprimento_m": 50
+    })
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'classificacao' in data
+    assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
+    assert 'vazao_total_lh' in data
+    assert data['vazao_total_lh'] == 200.0
+
+def test_status_faixa_descontinua(client):
+    # Pass 'se' large enough to trigger the warning
+    # We need an existing reading to test /api/status. We can just insert one using test_sensor_post_valid, or mock it.
+    client.post('/api/sensor', json={'umidade': 50.0, 'temperatura_max': 30.0, 'temperatura_min': 20.0})
+
+    # Se is huge, should trigger warning
+    response = client.get('/api/status?se=100.0&alpha=0.5&q=10.0&ko=1.0')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data.get('alerta_faixa_descontinua') is True
+    assert data.get('mensagem_faixa') == "Afastamento excessivo entre gotejadores. A faixa contínua de humidade será rompida, prejudicando as raízes."
