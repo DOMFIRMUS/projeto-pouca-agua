@@ -2,6 +2,78 @@ import math
 import datetime
 
 class CalculadorIrrigacao:
+
+    def obter_duracao_maxima_n(self, latitude_sul, mes_index):
+        if mes_index < 1 or mes_index > 12:
+            mes_index = 1
+        lat_abs = abs(latitude_sul)
+        if lat_abs >= 70:
+            return self.MATRIZ_N_MAX_SUL[70][int(mes_index) - 1]
+        if lat_abs <= 0:
+            return self.MATRIZ_N_MAX_SUL[0][int(mes_index) - 1]
+
+        lat_lower = int(lat_abs // 2) * 2
+        lat_upper = lat_lower + 2
+
+        if lat_lower == lat_abs:
+            return self.MATRIZ_N_MAX_SUL[lat_lower][int(mes_index) - 1]
+
+        n_lower = self.MATRIZ_N_MAX_SUL[lat_lower][int(mes_index) - 1]
+        n_upper = self.MATRIZ_N_MAX_SUL[lat_upper][int(mes_index) - 1]
+
+        fracao = (lat_abs - lat_lower) / 2.0
+        n_interp = n_lower + fracao * (n_upper - n_lower)
+        return n_interp
+
+    def calcular_radiacao_solar_rs(self, ra_calculado, n_insolacao, N_maximo):
+        if N_maximo <= 0:
+            razao_nN = 0.0
+        else:
+            razao_nN = n_insolacao / N_maximo
+
+        rs = (0.25 + 0.50 * razao_nN) * ra_calculado
+        return round(rs, 3)
+
+
+    MATRIZ_N_MAX_SUL = {
+        70: [24.0, 17.4, 13.0, 8.4, 2.7, 0.0, 0.0, 6.4, 11.2, 15.7, 21.7, 24.0],
+        68: [21.9, 16.7, 12.9, 8.7, 4.3, 0.0, 1.7, 7.0, 11.3, 15.3, 19.9, 24.0],
+        66: [20.1, 16.2, 12.8, 9.1, 5.3, 2.0, 3.7, 7.6, 11.3, 15.0, 18.8, 22.1],
+        64: [19.0, 15.8, 12.8, 9.3, 6.1, 3.7, 4.8, 8.0, 11.4, 14.7, 18.0, 20.3],
+        62: [18.3, 15.5, 12.7, 9.6, 6.7, 4.8, 5.6, 8.3, 11.4, 14.5, 17.4, 19.2],
+        60: [17.6, 15.2, 12.6, 9.8, 7.2, 5.6, 6.3, 8.7, 11.5, 14.3, 16.9, 18.4],
+        58: [17.1, 14.9, 12.6, 9.9, 7.6, 6.2, 6.8, 8.9, 11.5, 14.1, 16.5, 17.8],
+        56: [16.7, 14.7, 12.5, 10.1, 8.0, 6.7, 7.2, 9.2, 11.6, 13.9, 16.1, 17.3],
+        54: [16.3, 14.5, 12.5, 10.2, 8.3, 7.2, 7.6, 9.4, 11.6, 13.8, 15.8, 16.9],
+        52: [16.0, 14.3, 12.5, 10.4, 8.6, 7.5, 8.0, 9.6, 11.6, 13.7, 15.5, 16.5],
+        50: [15.7, 14.2, 12.4, 10.5, 8.8, 7.9, 8.3, 9.7, 11.7, 13.7, 15.3, 16.1],
+        48: [15.4, 14.0, 12.4, 10.6, 9.0, 8.2, 8.5, 9.9, 11.7, 13.4, 15.0, 15.8],
+        46: [15.2, 13.9, 12.4, 10.7, 9.2, 8.5, 8.8, 10.0, 11.7, 13.3, 14.8, 15.5],
+        44: [14.9, 13.7, 12.4, 10.8, 9.4, 8.7, 9.0, 10.2, 11.7, 13.3, 14.6, 15.3],
+        42: [14.7, 13.6, 12.3, 10.8, 9.6, 9.0, 9.2, 10.3, 11.7, 13.2, 14.4, 15.0],
+        40: [14.5, 13.5, 12.3, 10.9, 9.8, 9.2, 9.4, 10.4, 11.8, 13.1, 14.3, 14.8],
+        38: [14.4, 13.4, 12.3, 11.0, 9.9, 9.4, 9.6, 10.5, 11.8, 13.0, 14.1, 14.6],
+        36: [14.2, 13.3, 12.3, 11.1, 10.1, 9.6, 9.8, 10.6, 11.8, 12.9, 13.9, 14.4],
+        34: [14.0, 13.2, 12.2, 11.1, 10.2, 9.7, 9.9, 10.7, 11.8, 12.9, 13.8, 14.3],
+        32: [13.9, 13.1, 12.2, 11.2, 10.4, 9.9, 10.1, 10.8, 11.8, 12.8, 13.7, 14.1],
+        30: [13.7, 13.0, 12.2, 11.3, 10.5, 10.1, 10.2, 10.9, 11.8, 12.7, 13.5, 13.9],
+        28: [13.6, 13.0, 12.2, 11.3, 10.6, 10.2, 10.4, 11.0, 11.8, 12.7, 13.4, 13.8],
+        26: [13.5, 12.9, 12.2, 11.4, 10.7, 10.4, 10.5, 11.1, 11.9, 12.6, 13.3, 13.6],
+        24: [13.3, 12.8, 12.2, 11.4, 10.8, 10.5, 10.7, 11.2, 11.9, 12.6, 13.2, 13.5],
+        22: [13.2, 12.7, 12.1, 11.5, 10.9, 10.7, 10.8, 11.2, 11.9, 12.5, 13.1, 13.3],
+        20: [13.1, 12.7, 12.1, 11.5, 11.1, 10.8, 10.9, 11.3, 11.9, 12.5, 13.0, 13.2],
+        18: [13.0, 12.6, 12.1, 11.6, 11.2, 10.9, 11.0, 11.4, 11.9, 12.4, 12.9, 13.1],
+        16: [12.9, 12.5, 12.1, 11.6, 11.3, 11.1, 11.1, 11.5, 11.9, 12.4, 12.8, 12.9],
+        14: [12.7, 12.4, 12.1, 11.7, 11.4, 11.2, 11.2, 11.5, 11.9, 12.3, 12.7, 12.8],
+        12: [12.6, 12.4, 12.1, 11.7, 11.4, 11.3, 11.4, 11.6, 11.9, 12.3, 12.6, 12.7],
+        10: [12.5, 12.3, 12.1, 11.8, 11.5, 11.4, 11.5, 11.7, 11.9, 12.2, 12.5, 12.6],
+        8:  [12.4, 12.3, 12.1, 11.8, 11.6, 11.5, 11.6, 11.7, 12.0, 12.2, 12.4, 12.5],
+        6:  [12.3, 12.2, 12.0, 11.9, 11.7, 11.7, 11.7, 11.8, 12.0, 12.1, 12.3, 12.3],
+        4:  [12.2, 12.1, 12.0, 11.9, 11.8, 11.8, 11.8, 11.9, 12.0, 12.1, 12.2, 12.2],
+        2:  [12.1, 12.1, 12.0, 12.0, 11.9, 11.9, 11.9, 11.9, 12.0, 12.0, 12.1, 12.1],
+        0:  [12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0]
+    }
+
     def __init__(self):
         # Parâmetros agronómicos padrão (Ex: Tomate / Cana-de-açúcar)
         self.umidade_critica = 40.0
@@ -140,7 +212,6 @@ class CalculadorIrrigacao:
 
         return self.tabela_ra[lat_par][mes_index - 1]
 
-    def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
     def calcular_pressao_atual_ea(self, es, umidade_relativa_media_ur):
         """
         Calcula a Pressão Atual de Vapor (ea) em kPa.
@@ -155,7 +226,7 @@ class CalculadorIrrigacao:
         """
         return round(es - ea, 4)
 
-    def calcular_eto_blaney_criddle(self, t_media, mes_index):
+    def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
         """
         Calcula a Evapotranspiração de Referência (ETo em mm/dia) usando o método de Blaney-Criddle-FAO.
         Baseado na Tabela 3 - Percentagem diária de horas anuais de luz solar (P) para Latitude Sul.
@@ -662,39 +733,16 @@ class CalculadorIrrigacao:
 
         raise ValueError("O loop iterativo não estabilizou em três casas decimais.")
     def calcular_lmax_perfil_tipo_IIa(self, H, Hvar, So, k_linha, L_inicial=50.0):
-        """
-        Determina o Comprimento Máximo da Linha Lateral sob o Perfil Tipo II-a (Declive Fraco).
-        Utiliza o algoritmo de aproximações sucessivas baseado nas equações 59, 60 e 61 da tese.
-        """
         L = L_inicial
         iteracoes = 0
         max_iteracoes = 1000
 
         while iteracoes < max_iteracoes:
-            razao = So / (k_linha * (L_atual ** 1.75))
-            if razao < 2.75:
-                raise ValueError(f"Restrição de limite físico não atendida (Equação 66): S0 / (k' * L^1.75) = {razao:.4f} < 2.75. O ganho por desnível não supera totalmente a perda por atrito em todas as seções.")
-
-            L_novo = (H * Hvar) / ((So - k_linha * (L_atual ** 1.75)) * (1 - Hvar))
-
-            if abs(L_novo - L_atual) < 0.001:
-                return L_novo
-
-            L_atual = L_novo
-            iteracoes += 1
-
-        raise ValueError("A iteração para calcular L não convergiu após 1000 passos.")
-            iteracoes += 1
-
-            # Condição da Equação 59
             condicao = So / (k_linha * (L ** 1.75))
             if not (0 < condicao < 1):
                 raise ValueError(f"Condição da Equação 59 não satisfeita (deve estar entre 0 e 1): {condicao}")
 
-            # Equação 61
             razao_lL = 1 - 0.56098 * (condicao ** 0.57143)
-
-            # Equação 60
             numerador = H * Hvar
             denominador = ((1 - ((1 - razao_lL) ** 2.35)) * k_linha * (L ** 1.33)) - (razao_lL * So)
 
@@ -703,11 +751,11 @@ class CalculadorIrrigacao:
 
             L_novo = numerador / denominador
 
-            # Critério de paragem
             if abs(L_novo - L) < 0.001:
                 return round(L_novo, 3)
 
             L = L_novo
+            iteracoes += 1
 
         raise Exception("O cálculo não convergiu após o número máximo de iterações.")
 
@@ -1041,38 +1089,6 @@ class CalculadorIrrigacao:
             num_subunidades_sugeridas = math.floor(24.0 / ti_horas)
 
         return tr_max, ti_horas, num_subunidades_sugeridas
-    def calcular_raio_umedecido(self, alpha, q, ko, se):
-        """
-        Calcula o raio umedecido (Rw) pela Equação 26 e verifica se a faixa contínua é rompida.
-        """
-        import math
-
-        if alpha <= 0 or ko <= 0:
-            return {"erro": "Alpha e Ko devem ser maiores que zero."}
-
-        term1 = 4 / ((alpha**2) * (math.pi**2))
-        term2 = q / (math.pi * ko)
-        term3 = 2 / (alpha * math.pi)
-
-        inside_sqrt = term1 + term2 - term3
-
-        if inside_sqrt < 0:
-            return {"erro": "Valores resultam em raiz quadrada negativa."}
-
-        rw = math.sqrt(inside_sqrt)
-
-        alerta = False
-        mensagem = ""
-
-        if se > (2 * rw):
-            alerta = True
-            mensagem = "Afastamento excessivo entre gotejadores. A faixa contínua de humidade será rompida, prejudicando as raízes."
-
-        return {
-            "rw": round(rw, 4),
-            "alerta_faixa_descontinua": alerta,
-            "mensagem": mensagem
-        }
     def calcular_raio_umedecido(self, alpha, q, ko, se=None):
         """
         Calcula o Raio Umedecido (Rw) para faixa contínua baseado na Equação 26.

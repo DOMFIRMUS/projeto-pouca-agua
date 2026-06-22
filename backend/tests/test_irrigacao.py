@@ -33,7 +33,7 @@ def test_avaliar_status_solo_encharcado():
 def test_calcular_eto_blaney_criddle():
     calc = CalculadorIrrigacao()
     # ETo para Lat 20 (Janeiro = 30%), t_media = 25
-    eto = calc.calcular_eto_blaney_criddle(25, 1, latitude_sul=20)
+    eto = calc.calcular_eto_blaney_criddle(25, 1)
     assert eto == 5.87
 
     # Test Lat 60 Sul in December (40%), t_media = 25
@@ -610,3 +610,24 @@ def test_calcular_raio_umedecido():
     # Alert, se = 6.0 > 5.76
     res4 = calc.calcular_raio_umedecido(alpha2, q2, ko2, se=6.0)
     assert res4["alerta"] == "a faixa contínua será rompida"
+
+def test_obter_duracao_maxima_n_interpolacao():
+    calc = CalculadorIrrigacao()
+    # Test decimal latitude 67.0 in January (mes_index = 1)
+    # Between 66: 20.1 and 68: 21.9
+    # Fracao = 0.5. 20.1 + 0.5 * (21.9 - 20.1) = 20.1 + 0.9 = 21.0
+    n = calc.obter_duracao_maxima_n(67.0, 1)
+    assert n == 21.0
+
+def test_calcular_radiacao_solar_rs_normal():
+    calc = CalculadorIrrigacao()
+    # rs = (0.25 + 0.5 * (5/10)) * 30 = (0.25 + 0.25) * 30 = 15.0
+    rs = calc.calcular_radiacao_solar_rs(30.0, 5.0, 10.0)
+    assert rs == 15.0
+
+def test_calcular_radiacao_solar_rs_polar_winter():
+    calc = CalculadorIrrigacao()
+    # n_maximo = 0
+    # rs = (0.25 + 0.5 * (0.0)) * 30 = 0.25 * 30 = 7.5
+    rs = calc.calcular_radiacao_solar_rs(30.0, 5.0, 0.0)
+    assert rs == 7.5
