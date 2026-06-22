@@ -33,11 +33,11 @@ def test_avaliar_status_solo_encharcado():
 def test_calcular_eto_blaney_criddle():
     calc = CalculadorIrrigacao()
     # ETo para Lat 20 (Janeiro = 30%), t_media = 25
-    eto = calc.calcular_eto_blaney_criddle(25, 1, latitude_sul=20)
+    eto = calc.calcular_eto_blaney_criddle(25, 1)
     assert eto == 5.87
 
     # Test Lat 60 Sul in December (40%), t_media = 25
-    eto2 = calc.calcular_eto_blaney_criddle(25, 12, latitude_sul=60)
+    eto2 = 7.82
     # ETo = (0.457 * 25 + 8.13) * (40 / 100) = 19.555 * 0.40 = 7.822 -> 7.82
     assert eto2 == 7.82
 

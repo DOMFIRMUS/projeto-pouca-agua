@@ -11,7 +11,7 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute("""
                 CREATE TABLE IF NOT EXISTS historico_leitura (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             codigo_projeto TEXT,
@@ -27,7 +27,7 @@ def init_db():
             perda_carga_total_mca REAL,
             data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    ''')
+    """)
     cursor.execute("PRAGMA table_info(historico_leitura)")
     columns = [info[1] for info in cursor.fetchall()]
     if 'codigo_projeto' not in columns:
@@ -36,7 +36,7 @@ def init_db():
     columns = [info[1] for info in cursor.fetchall()]
     if 'codigo_projeto' not in columns:
         cursor.execute('ALTER TABLE historico_leitura ADD COLUMN codigo_projeto TEXT')
-    cursor.execute('''
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS culturas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT,
@@ -50,8 +50,8 @@ def init_db():
             min_ce REAL DEFAULT 1.0,
             max_ce REAL DEFAULT 3.0
         )
-    ''')
-    cursor.execute('''
+    """)
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS projetos_metadados (
             codigo_projeto TEXT PRIMARY KEY UNIQUE,
             nome_projeto TEXT,
@@ -63,8 +63,8 @@ def init_db():
             area_subunidade REAL,
             data_elaboracao TEXT
         )
-    ''')
-    cursor.execute('''
+    """)
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS projetos_metadados (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             codigo_projeto TEXT UNIQUE NOT NULL,
@@ -78,15 +78,15 @@ def init_db():
             area_subunidade REAL,
             data_elaboracao TEXT
         )
-    ''')
-    cursor.execute('''
+    """)
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS bancos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT NOT NULL,
             taxa_mensal REAL NOT NULL
         )
-    ''')
-    cursor.execute('''
+    """)
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS projetos_metadados (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             codigo_projeto TEXT UNIQUE NOT NULL,
@@ -95,19 +95,37 @@ def init_db():
             altura INTEGER,
             profundidade INTEGER
         )
-    ''')
+    """)
+
+    cursor.execute("PRAGMA table_info(projetos_metadados)")
+    columns = [info[1] for info in cursor.fetchall()]
+    novas_colunas = {
+        'tipo_disposicao': 'TEXT',
+        'configuracao_linha': 'TEXT',
+        'parametro_alpha': 'REAL',
+        'condutividade_ko': 'REAL',
+        'profundidade_z': 'REAL',
+        'rw_calculado': 'REAL',
+        'dw_calculado': 'REAL',
+        'pw_final': 'REAL'
+    }
+
+    for col_name, col_type in novas_colunas.items():
+        if col_name not in columns:
+            cursor.execute(f'ALTER TABLE projetos_metadados ADD COLUMN {col_name} {col_type}')
+
     conn.commit()
+
     conn.close()
 
-def insert_projeto(codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao):
 def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, profundidade):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute('''
+        cursor.execute("""
             INSERT INTO projetos_metadados (codigo_projeto, nome_projeto, largura, altura, profundidade)
             VALUES (?, ?, ?, ?, ?)
-        ''', (codigo_projeto, nome_projeto, largura, altura, profundidade))
+        """, (codigo_projeto, nome_projeto, largura, altura, profundidade))
         conn.commit()
         return True
     except sqlite3.IntegrityError:
@@ -175,29 +193,33 @@ def seed_culturas():
         ('Trigo (Primavera)', 0.30, 1.15, 0.25, '2023-07-01', 20, 35, 30, 1.0, 3.0)
     ]
 
-    if count == 0:
-        culturas = [
-            ('Algodoeiro', 0.35, 1.20, 0.60, '2023-10-01', 30, 50, 40, 7.7, 27.0),
-            ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.7, 10.0),
-            ('Tomate', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 2.5, 12.5),
-            ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.3, 4.0),
-            ('Cebola', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.2, 7.2),
-            ('Tomate tutorado', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 1.0, 3.0),
-            ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.0, 3.0),
-            ('Batata', 0.50, 1.15, 0.75, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-            ('Cebola seca', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.0, 3.0),
-            ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.0, 3.0),
-            ('Melancia', 0.40, 1.00, 0.75, '2023-09-05', 20, 30, 20, 1.0, 3.0)
-        ]
-        cursor.executemany('''
     for cultura in culturas:
-        cursor.execute('''
+        cursor.execute("""
             INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce)
             SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             WHERE NOT EXISTS (SELECT 1 FROM culturas WHERE nome = ?)
-        ''', cultura + (cultura[0],))
+        """, cultura + (cultura[0],))
+
+
+    cursor.execute("PRAGMA table_info(projetos_metadados)")
+    columns = [info[1] for info in cursor.fetchall()]
+    novas_colunas = {
+        'tipo_disposicao': 'TEXT',
+        'configuracao_linha': 'TEXT',
+        'parametro_alpha': 'REAL',
+        'condutividade_ko': 'REAL',
+        'profundidade_z': 'REAL',
+        'rw_calculado': 'REAL',
+        'dw_calculado': 'REAL',
+        'pw_final': 'REAL'
+    }
+
+    for col_name, col_type in novas_colunas.items():
+        if col_name not in columns:
+            cursor.execute(f'ALTER TABLE projetos_metadados ADD COLUMN {col_name} {col_type}')
 
     conn.commit()
+
     conn.close()
 
 def get_culturas():
@@ -219,12 +241,31 @@ def get_bancos():
 def insert_banco(nome, taxa_mensal):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute("""
         INSERT INTO bancos (nome, taxa_mensal)
         VALUES (?, ?)
-    ''', (nome, taxa_mensal))
+    """, (nome, taxa_mensal))
     row_id = cursor.lastrowid
+
+    cursor.execute("PRAGMA table_info(projetos_metadados)")
+    columns = [info[1] for info in cursor.fetchall()]
+    novas_colunas = {
+        'tipo_disposicao': 'TEXT',
+        'configuracao_linha': 'TEXT',
+        'parametro_alpha': 'REAL',
+        'condutividade_ko': 'REAL',
+        'profundidade_z': 'REAL',
+        'rw_calculado': 'REAL',
+        'dw_calculado': 'REAL',
+        'pw_final': 'REAL'
+    }
+
+    for col_name, col_type in novas_colunas.items():
+        if col_name not in columns:
+            cursor.execute(f'ALTER TABLE projetos_metadados ADD COLUMN {col_name} {col_type}')
+
     conn.commit()
+
     conn.close()
     return row_id
 
@@ -232,19 +273,38 @@ def delete_banco(banco_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM bancos WHERE id = ?', (banco_id,))
+
+    cursor.execute("PRAGMA table_info(projetos_metadados)")
+    columns = [info[1] for info in cursor.fetchall()]
+    novas_colunas = {
+        'tipo_disposicao': 'TEXT',
+        'configuracao_linha': 'TEXT',
+        'parametro_alpha': 'REAL',
+        'condutividade_ko': 'REAL',
+        'profundidade_z': 'REAL',
+        'rw_calculado': 'REAL',
+        'dw_calculado': 'REAL',
+        'pw_final': 'REAL'
+    }
+
+    for col_name, col_type in novas_colunas.items():
+        if col_name not in columns:
+            cursor.execute(f'ALTER TABLE projetos_metadados ADD COLUMN {col_name} {col_type}')
+
     conn.commit()
+
     conn.close()
 
 def insert_projeto(dados):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute('''
+        cursor.execute("""
             INSERT INTO projetos_metadados (
                 codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario,
                 nome_projetista, codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
+        """, (
             dados.get('codigo_projeto'),
             dados.get('nome_projeto'),
             dados.get('nome_propriedade'),
@@ -265,22 +325,41 @@ def insert_projeto(dados):
 def insert_leitura(umidade, temperatura_max, temperatura_min, eto_calculada=0.0, cad_calculada=0.0, irn_calculada=0.0, comprimento_lateral_m=0.0, perda_carga_total_mca=0.0):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute("""
         INSERT INTO historico_leitura (umidade, temperatura_max, temperatura_min, eto_calculada, cad_calculada, irn_calculada, comprimento_lateral_m, perda_carga_total_mca)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (umidade, temperatura_max, temperatura_min, eto_calculada, cad_calculada, irn_calculada, comprimento_lateral_m, perda_carga_total_mca))
+    """, (umidade, temperatura_max, temperatura_min, eto_calculada, cad_calculada, irn_calculada, comprimento_lateral_m, perda_carga_total_mca))
     row_id = cursor.lastrowid
+
+    cursor.execute("PRAGMA table_info(projetos_metadados)")
+    columns = [info[1] for info in cursor.fetchall()]
+    novas_colunas = {
+        'tipo_disposicao': 'TEXT',
+        'configuracao_linha': 'TEXT',
+        'parametro_alpha': 'REAL',
+        'condutividade_ko': 'REAL',
+        'profundidade_z': 'REAL',
+        'rw_calculado': 'REAL',
+        'dw_calculado': 'REAL',
+        'pw_final': 'REAL'
+    }
+
+    for col_name, col_type in novas_colunas.items():
+        if col_name not in columns:
+            cursor.execute(f'ALTER TABLE projetos_metadados ADD COLUMN {col_name} {col_type}')
+
     conn.commit()
+
     conn.close()
     return row_id
 
 def get_ultima_leitura():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute("""
         SELECT * FROM historico_leitura
         ORDER BY id DESC LIMIT 1
-    ''')
+    """)
     row = cursor.fetchone()
     conn.close()
     if row:
@@ -290,21 +369,40 @@ def get_ultima_leitura():
 def update_leitura_status(leitura_id, status_solo, tempo_irrigacao_calculado, eto_calculada=0.0, cad_calculada=0.0, irn_calculada=0.0, comprimento_lateral_m=0.0, perda_carga_total_mca=0.0):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute("""
         UPDATE historico_leitura
         SET status_solo = ?, tempo_irrigacao_calculado = ?, eto_calculada = ?, cad_calculada = ?, irn_calculada = ?, comprimento_lateral_m = ?, perda_carga_total_mca = ?
         WHERE id = ?
-    ''', (status_solo, tempo_irrigacao_calculado, eto_calculada, cad_calculada, irn_calculada, comprimento_lateral_m, perda_carga_total_mca, leitura_id))
+    """, (status_solo, tempo_irrigacao_calculado, eto_calculada, cad_calculada, irn_calculada, comprimento_lateral_m, perda_carga_total_mca, leitura_id))
+
+    cursor.execute("PRAGMA table_info(projetos_metadados)")
+    columns = [info[1] for info in cursor.fetchall()]
+    novas_colunas = {
+        'tipo_disposicao': 'TEXT',
+        'configuracao_linha': 'TEXT',
+        'parametro_alpha': 'REAL',
+        'condutividade_ko': 'REAL',
+        'profundidade_z': 'REAL',
+        'rw_calculado': 'REAL',
+        'dw_calculado': 'REAL',
+        'pw_final': 'REAL'
+    }
+
+    for col_name, col_type in novas_colunas.items():
+        if col_name not in columns:
+            cursor.execute(f'ALTER TABLE projetos_metadados ADD COLUMN {col_name} {col_type}')
+
     conn.commit()
+
     conn.close()
 
 def get_historico():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute("""
         SELECT * FROM historico_leitura
         ORDER BY id DESC LIMIT 10
-    ''')
+    """)
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
@@ -322,37 +420,68 @@ def obter_projeto_por_codigo(codigo_projeto):
 def obter_resumo_hidraulico(codigo_projeto):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute("""
         SELECT * FROM historico_leitura
         WHERE codigo_projeto = ?
         ORDER BY id DESC LIMIT 1
-    ''', (codigo_projeto,))
+    """, (codigo_projeto,))
     row = cursor.fetchone()
     conn.close()
     if row:
         return dict(row)
     return None
 
-def obter_projeto_por_codigo(codigo_projeto):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM projetos_metadados WHERE codigo_projeto = ?', (codigo_projeto,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return dict(row)
-    return None
 
-def obter_resumo_hidraulico(codigo_projeto):
+
+def salvar_dados_area_umedecida(codigo_projeto, dados):
+    """
+    Atualiza os dados de área umedecida para um projeto existente na tabela projetos_metadados.
+    Retorna True se atualizou alguma linha, False caso contrário.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT * FROM historico_leitura
+        UPDATE projetos_metadados
+        SET tipo_disposicao = ?,
+            configuracao_linha = ?,
+            parametro_alpha = ?,
+            condutividade_ko = ?,
+            profundidade_z = ?,
+            rw_calculado = ?,
+            dw_calculado = ?,
+            pw_final = ?
         WHERE codigo_projeto = ?
-        ORDER BY id DESC LIMIT 1
-    ''', (codigo_projeto,))
-    row = cursor.fetchone()
+    ''', (
+        dados.get('tipo_disposicao'),
+        dados.get('configuracao_linha'),
+        dados.get('parametro_alpha'),
+        dados.get('condutividade_ko'),
+        dados.get('profundidade_z'),
+        dados.get('rw_calculado'),
+        dados.get('dw_calculado'),
+        dados.get('pw_final'),
+        codigo_projeto
+    ))
+    rows_affected = cursor.rowcount
+
+    cursor.execute("PRAGMA table_info(projetos_metadados)")
+    columns = [info[1] for info in cursor.fetchall()]
+    novas_colunas = {
+        'tipo_disposicao': 'TEXT',
+        'configuracao_linha': 'TEXT',
+        'parametro_alpha': 'REAL',
+        'condutividade_ko': 'REAL',
+        'profundidade_z': 'REAL',
+        'rw_calculado': 'REAL',
+        'dw_calculado': 'REAL',
+        'pw_final': 'REAL'
+    }
+
+    for col_name, col_type in novas_colunas.items():
+        if col_name not in columns:
+            cursor.execute(f'ALTER TABLE projetos_metadados ADD COLUMN {col_name} {col_type}')
+
+    conn.commit()
+
     conn.close()
-    if row:
-        return dict(row)
-    return None
+    return rows_affected > 0
