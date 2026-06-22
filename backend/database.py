@@ -35,8 +35,39 @@ def init_db():
             dias_fase_final INTEGER
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS projetos_metadados (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo_projeto TEXT UNIQUE NOT NULL,
+            nome_projeto TEXT,
+            nome_propriedade TEXT,
+            nome_proprietario TEXT,
+            nome_projetista TEXT,
+            identificacao TEXT,
+            nome_codigo_subunidade TEXT,
+            area_total_irrigada REAL,
+            area_subunidade REAL,
+            data_elaboracao TEXT
+        )
+    ''')
     conn.commit()
     conn.close()
+
+def insert_projeto(codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO projetos_metadados (codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao))
+        row_id = cursor.lastrowid
+        conn.commit()
+        return {"status": "sucesso", "id": row_id}
+    except sqlite3.IntegrityError:
+        return {"status": "erro", "mensagem": "Já existe um projeto com este código. O código do projeto deve ser único."}
+    finally:
+        conn.close()
 
 def seed_culturas():
     conn = get_db_connection()
