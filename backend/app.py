@@ -100,6 +100,7 @@ def _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agu
         sp_m=dados_sistema["espacamento_plantas_m"],
         sr_m=dados_sistema["espacamento_fileiras_m"]
     )
+
     # Verifica se foi enviada a condutividade elétrica da água via query params
     ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
 
@@ -446,6 +447,7 @@ def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
 
+@app.route('/api/hidraulica_perfil', methods=['POST'])
 @app.route('/api/classificar_hidraulica', methods=['POST'])
 
 

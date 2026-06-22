@@ -713,6 +713,21 @@ class CalculadorIrrigacao:
         pressao_inicial = pressao_emissor + perda_carga_tubulacao + hfl_l
         return pressao_inicial
 
+    def calcular_constante_psicrometrica(self, altitude_z):
+        """
+        Calcula a Pressão Atmosférica (P) e a Constante Psicrométrica (γ)
+        com base na altitude z (metros) usando as Equações 22 e 23 da tese.
+        """
+        if altitude_z < 0:
+            altitude_z = 0
+
+        # Equação 22: P = 101.3 * (((293 - 0.0065 * z) / 293) ^ 5.26)
+        p_kpa = 101.3 * (((293 - 0.0065 * altitude_z) / 293) ** 5.26)
+
+        # Equação 23: gamma = 0.665 * 10^-3 * P
+        gamma = (0.665 * (10 ** -3)) * p_kpa
+
+        return round(p_kpa, 2), round(gamma, 6)
     def validar_criterio_pressao_subunidade(self, perda_carga_total_hf, pressao_entrada_h):
         """
         Validador de uniformidade de descarga hidráulica na subunidade baseando-se
