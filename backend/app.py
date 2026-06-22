@@ -174,6 +174,7 @@ def obter_status():
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
@@ -233,6 +234,8 @@ def perda_carga():
     if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
+    # Verifica se os campos correspondem à segunda rota (perfil de pressão)
+    if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
     # Branch 1: Profile classification
     if 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
         if 'So' not in dados or 'k_linha' not in dados or 'L_estimado' not in dados:
@@ -241,6 +244,16 @@ def perda_carga():
             So = float(dados['So'])
             k_linha = float(dados['k_linha'])
             L_estimado = float(dados['L_estimado'])
+        except ValueError:
+            return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+
+        classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+        return jsonify({"classificacao": classificacao}), 200
+
+    # Verifica erro específico para testes que testam apenas alguns dos campos So, k_linha, L_estimado (fallback compatibility for tests)
+    if 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
+        return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+
             classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
             return jsonify({"classificacao": classificacao}), 200
         except ValueError:
@@ -275,6 +288,8 @@ def perda_carga():
             return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
 
     return jsonify({"erro": "Parâmetros inválidos"}), 400
+
+    return jsonify(resultado), 200
 
 @app.route('/api/culturas', methods=['GET'])
 def obter_culturas():
