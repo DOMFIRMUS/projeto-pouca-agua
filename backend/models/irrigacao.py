@@ -2,6 +2,17 @@ import math
 import datetime
 
 class CalculadorIrrigacao:
+
+    def definir_kc_por_estagio(self, kc_inicial, kc_media, kc_final, estagio):
+        if estagio == 'inicial':
+            return kc_inicial
+        elif estagio == 'meia_estacao':
+            return kc_media
+        elif estagio == 'final':
+            return kc_final
+        else:
+            return kc_media
+
     def __init__(self):
         # Parâmetros agronómicos padrão (Ex: Tomate / Cana-de-açúcar)
         self.umidade_critica = 40.0
@@ -140,8 +151,6 @@ class CalculadorIrrigacao:
 
         return self.tabela_ra[lat_par][mes_index - 1]
 
-    def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
-    def calcular_pressao_atual_ea(self, es, umidade_relativa_media_ur):
         """
         Calcula a Pressão Atual de Vapor (ea) em kPa.
         Equação 15 da Tese: ea = es * (UR_m / 100)
@@ -155,9 +164,8 @@ class CalculadorIrrigacao:
         """
         return round(es - ea, 4)
 
-    def calcular_eto_blaney_criddle(self, t_media, mes_index):
+    def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
         """
-        Calcula a Evapotranspiração de Referência (ETo em mm/dia) usando o método de Blaney-Criddle-FAO.
         Baseado na Tabela 3 - Percentagem diária de horas anuais de luz solar (P) para Latitude Sul.
         """
         # Tabela 3 - Percentagem diária de horas anuais de luz solar (Latitudes Sul)
@@ -684,31 +692,6 @@ class CalculadorIrrigacao:
             iteracoes += 1
 
         raise ValueError("A iteração para calcular L não convergiu após 1000 passos.")
-            iteracoes += 1
-
-            # Condição da Equação 59
-            condicao = So / (k_linha * (L ** 1.75))
-            if not (0 < condicao < 1):
-                raise ValueError(f"Condição da Equação 59 não satisfeita (deve estar entre 0 e 1): {condicao}")
-
-            # Equação 61
-            razao_lL = 1 - 0.56098 * (condicao ** 0.57143)
-
-            # Equação 60
-            numerador = H * Hvar
-            denominador = ((1 - ((1 - razao_lL) ** 2.35)) * k_linha * (L ** 1.33)) - (razao_lL * So)
-
-            if denominador == 0:
-                 raise ZeroDivisionError("Divisão por zero ao calcular o novo comprimento L.")
-
-            L_novo = numerador / denominador
-
-            # Critério de paragem
-            if abs(L_novo - L) < 0.001:
-                return round(L_novo, 3)
-
-            L = L_novo
-
         raise Exception("O cálculo não convergiu após o número máximo de iterações.")
 
     def classificar_perfil_pressao(self, So, k_linha, L_estimado):
