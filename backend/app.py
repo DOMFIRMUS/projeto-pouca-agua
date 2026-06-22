@@ -134,6 +134,12 @@ def _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agu
     tempo_irrigacao_horas = tempo_irrigacao_calculado_minutos / 60.0
     agenda_rega = calculador.fracionar_tempo_irrigacao(tempo_irrigacao_horas)
 
+    # Cálculo da Pressão Atual de Vapor e Déficit de Pressão de Vapor
+    # Usando valores de placeholder para Pressão de Saturação (es) e Umidade Relativa (ur)
+    es_placeholder = 2.4
+    ur_placeholder = 60.0
+    ea = calculador.calcular_pressao_atual_ea(es_placeholder, ur_placeholder)
+    deficit_pressao_vapor_kpa = calculador.calcular_deficit_pressao_vapor(es_placeholder, ea)
     try:
         comprimento_lateral_m = calculador.comprimento_trecho_a_trecho(
             diametro_m=dados_sistema.get("diametro_lateral_m", 0.016),
@@ -266,6 +272,9 @@ def obter_status():
             "irrigacao_real_necessaria_max_mm": irn_max,
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
+            "fracao_lixiviacao": fl,
+            "irrigacao_total_necessaria_mm": itn,
+            "deficit_pressao_vapor_kpa": deficit_pressao_vapor_kpa
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
@@ -342,6 +351,10 @@ def perda_carga():
     if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
+    if 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
+        if not ('So' in dados and 'k_linha' in dados and 'L_estimado' in dados):
+            return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+
     # Verifica se os campos correspondem à segunda rota (perfil de pressão)
     if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
     # Branch 1: Profile classification
@@ -356,6 +369,10 @@ def perda_carga():
             return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
 
         classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+
+        return jsonify({"classificacao": classificacao}), 200
+
+    campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
         return jsonify({"classificacao": classificacao}), 200
 
     # Verifica erro específico para testes que testam apenas alguns dos campos So, k_linha, L_estimado (fallback compatibility for tests)
