@@ -125,6 +125,22 @@ def test_hidraulica_post_invalid_type(client):
     assert 'erro' in data
     assert "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos." in data['erro']
 
+def test_hidraulica_post_mixed_payload(client):
+    response = client.post('/api/hidraulica', json={
+        'So': 0.5,
+        'k_linha': 1.0,
+        'L_estimado': 1.0,
+        "diametro_mm": 16,
+        "vazao_gotejador_lh": 2,
+        "espacamento_m": 0.5,
+        "comprimento_m": 50
+    })
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'classificacao' in data
+    assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
+    assert 'vazao_total_lh' in data
+    assert data['vazao_total_lh'] == 200.0
 
 def test_status_faixa_descontinua(client):
     # Pass 'se' large enough to trigger the warning

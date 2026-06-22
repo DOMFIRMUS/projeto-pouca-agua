@@ -173,6 +173,8 @@ def obter_status():
             "irrigacao_real_necessaria_max_mm": irn_max,
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
+            "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
+            "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn,
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
@@ -264,6 +266,67 @@ def obter_culturas():
 @app.route('/api/hidraulica', methods=['POST'])
 def processar_hidraulica():
     dados = request.get_json()
+
+    if not dados:
+        return jsonify({"erro": "Nenhum dado enviado"}), 400
+
+    resposta_combinada = {}
+    erro_ocorrido = False
+    mensagem_erro = ""
+
+    # Verifica parâmetros de topografia / perfil (obter_hidraulica original)
+    if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
+        try:
+            So = float(dados['So'])
+            k_linha = float(dados['k_linha'])
+            L_estimado = float(dados['L_estimado'])
+            classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+            resposta_combinada["classificacao"] = classificacao
+        except ValueError:
+            erro_ocorrido = True
+            mensagem_erro = "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."
+
+    # Verifica parâmetros básicos (hidraulica original)
+    campos_basicos = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
+    tem_todos_basicos = all(campo in dados for campo in campos_basicos)
+
+    if tem_todos_basicos:
+        try:
+            diametro_mm = float(dados['diametro_mm'])
+            vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
+            espacamento_m = float(dados['espacamento_m'])
+            comprimento_m = float(dados['comprimento_m'])
+
+            resultado = calculador.calcular_perda_carga(
+                diametro_mm,
+                vazao_gotejador_lh,
+                espacamento_m,
+                comprimento_m
+            )
+
+            if "erro" in resultado:
+                erro_ocorrido = True
+                mensagem_erro = resultado["erro"]
+            else:
+                resposta_combinada.update(resultado)
+        except ValueError:
+            erro_ocorrido = True
+            mensagem_erro = "Todos os parâmetros devem ser números válidos."
+
+    # Caso onde nenhum dos conjuntos de chaves foi enviado completo
+    if not resposta_combinada and not erro_ocorrido:
+        # Se for um payload misto incompleto, lançar um erro genérico baseado no que falta
+        if any(campo in dados for campo in ['So', 'k_linha', 'L_estimado']):
+             return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+        else:
+             faltando = [campo for campo in campos_basicos if campo not in dados]
+             if faltando:
+                 return jsonify({"erro": f"O campo '{faltando[0]}' é obrigatório."}), 400
+
+    if erro_ocorrido:
+         return jsonify({"erro": mensagem_erro}), 400
+
+    return jsonify(resposta_combinada), 200
 
     if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
