@@ -25,9 +25,9 @@ dados_sistema = {
     "espacamento_plantas_sp": 0.5,
     "espacamento_fileiras_sr": 1.0,
     "dw_diametro_molhado": 0.3,
-    "vazao_emissor_qa": 2.0
+    "vazao_emissor_qa": 2.0,
     "espacamento_plantas_m": 0.5,   # Espaçamento entre plantas na fileira
-    "espacamento_fileiras_m": 1.0   # Espaçamento entre fileiras
+    "espacamento_fileiras_m": 1.0,   # Espaçamento entre fileiras
     "ce_solo_min": 1.0,             # Condutividade elétrica mínima do solo suportada (dS/m) - padrão
     "ce_solo_max": 3.0,             # Condutividade elétrica máxima tolerada pela cultura (dS/m)
     "uniformidade_emissao_decimal": 0.90 # Uniformidade de emissão do gotejador (90%)
@@ -70,7 +70,21 @@ def obter_status():
     if metodo_eto.lower() == 'blaney-criddle':
         eto = calculador.calcular_eto_blaney_criddle(
             t_media,
-            mes_index=dados_sistema["mes_atual"]
+            mes_index=dados_sistema["mes_atual"],
+            latitude_sul=-22.0
+        )
+    elif metodo_eto.lower() == 'penman-monteith':
+        # Penman-Monteith required inputs, using defaults for robustness if not passed
+        rn = float(request.args.get('rn', 15.0))
+        g = float(request.args.get('g', 0.0))
+        u2 = float(request.args.get('u2', 2.0))
+        es = float(request.args.get('es', 3.0))
+        ea = float(request.args.get('ea', 1.5))
+        delta = float(request.args.get('delta', 0.15))
+        gama = float(request.args.get('gama', 0.066))
+
+        eto = calculador.calcular_eto_penman_monteith(
+            rn, g, t_media, u2, es, ea, delta, gama
         )
     else:
         eto = calculador.calcular_eto_hargreaves(
@@ -96,6 +110,7 @@ def obter_status():
         etc_mm_dia=eto,
         sp_m=dados_sistema["espacamento_plantas_m"],
         sr_m=dados_sistema["espacamento_fileiras_m"]
+    )
     # Verifica se foi enviada a condutividade elétrica da água via query params
     ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
 
@@ -155,8 +170,8 @@ def obter_status():
             "irrigacao_real_necessaria_max_mm": irn_max,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
             "tempo_irrigacao_horas": ti_horas,
-            "numero_emissores_por_planta": np_emissores
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos
+            "numero_emissores_por_planta": np_emissores,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0)

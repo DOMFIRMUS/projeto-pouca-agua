@@ -55,14 +55,52 @@ class CalculadorIrrigacao:
 
         return self.tabela_ra[lat_par][mes_index - 1]
 
-    def calcular_eto_blaney_criddle(self, t_media, mes_index):
+    def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
         """
         Calcula a Evapotranspiração de Referência (ETo em mm/dia) usando o método de Blaney-Criddle-FAO.
+        Baseado na Tabela 3 - Percentagem diária de horas anuais de luz solar (P) para Latitude Sul.
         """
-        # Percentagem diária de horas anuais de luz solar para a Latitude 20 Sul
-        p_dict = {1: 25, 2: 26, 3: 27, 4: 28, 5: 29, 6: 30, 7: 30, 8: 29, 9: 28, 10: 26, 11: 25, 12: 25}
+        # Tabela 3 - Percentagem diária de horas anuais de luz solar (Latitudes Sul)
+        # Mapeia latitude (0 a 60) para os meses (1 a 12)
+        # Note que a Tabela 3 tem a ordem para "South" começando com Julho.
+        # Os valores da Tabela 3 lidos pela OCR (e corrigidos onde óbvio):
+        # Lat South: Jul Aug Sep Oct Nov Dec Jan Feb Mar Apr May Jun
+        # Reorganizando para a ordem dos meses Jan (1) a Dez (12):
+        tabela_p_sul = {
+            60: [41, 38, 32, 26, 20, 15, 13, 17, 22, 28, 34, 40],
+            55: [39, 36, 32, 26, 21, 17, 16, 18, 23, 28, 33, 39],
+            50: [36, 34, 31, 27, 23, 19, 18, 20, 24, 28, 32, 35],
+            45: [35, 34, 30, 27, 23, 20, 20, 21, 24, 28, 32, 34],
+            40: [34, 32, 30, 27, 24, 22, 21, 22, 25, 28, 31, 33],
+            35: [32, 31, 29, 27, 25, 23, 22, 23, 25, 28, 30, 32],
+            30: [32, 31, 29, 27, 25, 24, 23, 24, 26, 28, 30, 31],
+            25: [31, 30, 29, 27, 26, 24, 24, 25, 26, 28, 29, 31],
+            20: [30, 29, 28, 27, 26, 25, 25, 26, 27, 28, 29, 30],
+            15: [29, 29, 28, 27, 26, 26, 25, 26, 27, 28, 28, 29],
+            10: [29, 28, 28, 27, 27, 26, 26, 26, 27, 28, 28, 29],
+            5:  [28, 28, 28, 27, 27, 27, 27, 27, 27, 28, 28, 28],
+            0:  [27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27]
+        }
 
-        p = p_dict.get(mes_index, 25)
+        # Garante que o mês está no intervalo correto
+        if mes_index < 1 or mes_index > 12:
+            mes_index = 1
+
+        lat_abs = abs(latitude_sul)
+
+        # Arredonda para o múltiplo de 5 mais próximo
+        lat_arredondada = round(lat_abs / 5) * 5
+
+        # Garante que a latitude está dentro dos limites da tabela
+        if lat_arredondada < 0:
+            lat_arredondada = 0
+        elif lat_arredondada > 60:
+            lat_arredondada = 60
+
+        # Pega a lista de porcentagens para a latitude arredondada
+        p_valores = tabela_p_sul.get(lat_arredondada, tabela_p_sul[20])
+        p = p_valores[mes_index - 1]
+
         eto = (0.457 * t_media + 8.13) * (p / 100)
         return round(eto, 2)
 
@@ -81,6 +119,22 @@ class CalculadorIrrigacao:
         term_diff = math.sqrt(max(t_max - t_min, 0.1))
 
         eto = 0.0023 * ra * 0.408 * term_temp * term_diff
+        return round(eto, 2)
+
+    def calcular_eto_penman_monteith(self, rn, g, t_media, u2, es, ea, delta, gama):
+        """
+        Calcula a Evapotranspiração de Referência (ETo em mm/dia) usando a equação
+        de Penman-Monteith - FAO56 (Equação 12 da imagem).
+        """
+        # Equação 12 da imagem: ETo = (0.408 * delta * (Rn - G) + gama * (900 / (T + 273)) * u2 * (es - ea)) / (delta + gama * (1 + 0.34 * u2))
+        numerador_1 = 0.408 * delta * (rn - g)
+        numerador_2 = gama * (900 / (t_media + 273)) * u2 * (es - ea)
+        denominador = delta + gama * (1 + 0.34 * u2)
+
+        if denominador == 0:
+            return 0.0
+
+        eto = (numerador_1 + numerador_2) / denominador
         return round(eto, 2)
 
     def corrigir_fator_deplecao(self, f_tabela, etc_calculada):
