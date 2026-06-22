@@ -77,7 +77,21 @@ def _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agu
     if metodo_eto.lower() == 'blaney-criddle':
         eto = calculador.calcular_eto_blaney_criddle(
             t_media,
-            mes_index=dados_sistema["mes_atual"]
+            mes_index=dados_sistema["mes_atual"],
+            latitude_sul=-22.0
+        )
+    elif metodo_eto.lower() == 'penman-monteith':
+        # Penman-Monteith required inputs, using defaults for robustness if not passed
+        rn = float(request.args.get('rn', 15.0))
+        g = float(request.args.get('g', 0.0))
+        u2 = float(request.args.get('u2', 2.0))
+        es = float(request.args.get('es', 3.0))
+        ea = float(request.args.get('ea', 1.5))
+        delta = float(request.args.get('delta', 0.15))
+        gama = float(request.args.get('gama', 0.066))
+
+        eto = calculador.calcular_eto_penman_monteith(
+            rn, g, t_media, u2, es, ea, delta, gama
         )
     else:
         eto = calculador.calcular_eto_hargreaves(
