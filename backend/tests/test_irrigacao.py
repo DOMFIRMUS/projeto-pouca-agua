@@ -363,6 +363,14 @@ def test_comprimento_trecho_a_trecho():
     assert isinstance(comprimento, float)
     assert comprimento > 0.0
 
+def test_calcular_lmax_perfil_tipo_I():
+    calc = CalculadorIrrigacao()
+    # Test values
+    # H = 10.0, Hvar = 2.0, So = 1.0, k_linha = 0.001
+    L_max = calc.calcular_lmax_perfil_tipo_I(10.0, 2.0, 1.0, 0.001)
+    assert isinstance(L_max, float)
+    assert L_max > 0.0
+
 def test_perda_conector_lateral():
     calc = CalculadorIrrigacao()
     # Valores de exemplo: diam=0.016, comp=0.05, vel_con=1.5, vel_lat=1.0
