@@ -94,6 +94,13 @@ def test_historico_get(client):
     assert data[1]['umidade'] == 40.0
 
 def test_hidraulica_post_success(client):
+    payload = {
+        "diametro_mm": 16,
+        "vazao_gotejador_lh": 2,
+        "espacamento_m": 0.5,
+        "comprimento_m": 50
+    }
+    response = client.post('/api/hidraulica', data=json.dumps(payload), content_type='application/json')
     response = client.post('/api/hidraulica/perfil', json={
     response = client.post('/api/hidraulica_perfil', json={
     response = client.post('/api/classificar_hidraulica', json={
@@ -107,10 +114,32 @@ def test_hidraulica_post_success(client):
     })
     assert response.status_code == 200
     data = json.loads(response.data)
-    assert 'classificacao' in data
-    assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
+    assert data['vazao_total_lh'] == 200.0
+    assert 'perda_carga_mca' in data
+    assert data['status'] == "Aceitável"
 
 def test_hidraulica_post_missing_fields(client):
+    payload = {
+        "diametro_mm": 16
+    }
+    response = client.post('/api/hidraulica', data=json.dumps(payload), content_type='application/json')
+    assert response.status_code == 400
+    data = json.loads(response.data)
+    assert 'erro' in data
+    assert "O campo 'vazao_gotejador_lh' é obrigatório." in data['erro']
+
+def test_hidraulica_post_invalid_type(client):
+    payload = {
+        "diametro_mm": "abc",
+        "vazao_gotejador_lh": 2,
+        "espacamento_m": 0.5,
+        "comprimento_m": 50
+    }
+    response = client.post('/api/hidraulica', data=json.dumps(payload), content_type='application/json')
+    assert response.status_code == 400
+    data = json.loads(response.data)
+    assert 'erro' in data
+    assert "Todos os parâmetros devem ser números válidos." in data['erro']
     response = client.post('/api/hidraulica/perfil', json={
     response = client.post('/api/hidraulica_perfil', json={
     response = client.post('/api/classificar_perfil', json={
