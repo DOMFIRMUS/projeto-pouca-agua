@@ -274,6 +274,7 @@ def obter_status():
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
@@ -494,6 +495,8 @@ def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
 
+@app.route('/api/classificar_perfil', methods=['POST'])
+def obter_classificacao_perfil():
 @app.route('/api/hidraulica_classificacao', methods=['POST'])
 @app.route('/api/hidraulica/perfil', methods=['POST'])
 @app.route('/api/hidraulica_perfil', methods=['POST'])
