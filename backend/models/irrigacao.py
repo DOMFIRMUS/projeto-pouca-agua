@@ -526,6 +526,26 @@ class CalculadorIrrigacao:
             return round(ps, 2)
 
         return 0.0
+    def calcular_lmax_perfil_tipo_IIc(self, H, Hvar, So, k_linha, L_inicial=50.0):
+        """
+        Calcula o comprimento máximo L para o Perfil Tipo II-c (Declive Forte).
+        Resolução iterativa da Equação 65 e validação da Equação 64 da tese.
+        """
+        L = L_inicial
+
+        for _ in range(1000):
+            L_novo = (Hvar + (k_linha * (L ** 2.75)) / 2.75) / So
+            if abs(L_novo - L) < 1e-4:
+                L_round = round(L_novo, 3)
+                # Validar a condição de existência baseada na Equação 64 da tese
+                razao = So / (k_linha * (L_round ** 1.75))
+                if 1 < razao < 2.75:
+                    return L_round
+                else:
+                    raise ValueError(f"Condição de existência falhou: razão {razao:.4f} fora do intervalo (1, 2.75)")
+            L = L_novo
+
+        raise ValueError("O loop iterativo não estabilizou em três casas decimais.")
     def calcular_lmax_perfil_tipo_IIa(self, H, Hvar, So, k_linha, L_inicial=50.0):
         """
         Determina o Comprimento Máximo da Linha Lateral sob o Perfil Tipo II-a (Declive Fraco).

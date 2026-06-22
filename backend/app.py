@@ -275,6 +275,7 @@ def obter_status():
             "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
