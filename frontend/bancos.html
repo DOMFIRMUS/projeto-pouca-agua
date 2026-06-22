@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciar Bancos - Projeto Pouca Água</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/bancos.css">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Pouca Água</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li><a href="index.html">Dashboard</a></li>
+                    <li><a href="bancos.html" class="active">Bancos</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <h1>Gerenciamento de Bancos</h1>
+                <button id="btn-add-banco" class="btn btn-primary">Adicionar Banco</button>
+            </header>
+
+            <section class="card table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Banco</th>
+                            <th>Taxa Mensal (%)</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bancos-tbody">
+                        <tr>
+                            <td colspan="3" class="text-center">Carregando bancos...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal Adicionar Banco -->
+    <div id="modal-add-banco" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Adicionar Novo Banco</h2>
+                <span class="close-btn">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="form-banco">
+                    <div class="form-group">
+                        <label for="nome">Nome do Banco</label>
+                        <input type="text" id="nome" name="nome" required placeholder="Ex: Banco do Brasil">
+                    </div>
+                    <div class="form-group">
+                        <label for="taxa_mensal">Taxa Mensal (%)</label>
+                        <input type="number" id="taxa_mensal" name="taxa_mensal" step="0.01" required placeholder="Ex: 1.50">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary close-btn-action">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Salvar Banco</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/bancos.js"></script>
+</body>
+</html>
