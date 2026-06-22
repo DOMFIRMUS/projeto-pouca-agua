@@ -264,6 +264,22 @@ class CalculadorIrrigacao:
 
         tr_max = math.floor(irn_max_mm / (etc_mm_dia * sp_m * sr_m))
         return tr_max
+    def resolver_fator_atrito_f(self, velocidade, diametro_m):
+        """
+        Calcula o fator de atrito (f) baseado na velocidade e no diâmetro.
+        Utiliza o número de Reynolds (R) e equações para diferentes regimes de escoamento.
+        """
+        r = (velocidade * diametro_m) / 1.01e-6
+
+        if r < 2000:
+            f = 64 / r if r > 0 else 0
+        elif 2000 <= r < 3000:
+            f = 0.04
+        else:
+            f = 0.316 / (r ** 0.25)
+
+        return f
+
     def comprimento_trecho_a_trecho(self, diametro_m, vazao_emissor_m3s, espacamento_m, pressao_entrada_mca, declividade, hvar_max):
         """
         Calcula o comprimento máximo da linha lateral trecho a trecho (do último emissor para o primeiro).
@@ -278,14 +294,7 @@ class CalculadorIrrigacao:
         while True:
             vazao_acumulada_m3s = i * vazao_emissor_m3s
             v = vazao_acumulada_m3s / area
-            r = (v * diametro_m) / 1.01e-6
-
-            if r < 2000:
-                f = 64 / r if r > 0 else 0
-            elif 2000 <= r < 3000:
-                f = 0.04
-            else:
-                f = 0.316 / (r ** 0.25)
+            f = self.resolver_fator_atrito_f(v, diametro_m)
 
             hf = 8.263e-2 * f * (vazao_acumulada_m3s ** 2 / diametro_m ** 5) * espacamento_m
 
@@ -468,6 +477,23 @@ class CalculadorIrrigacao:
             return 'Perfil Tipo IIc (Declive Forte)'
         else:
             return 'Perfil Tipo IId (Declive Muito Forte)'
+    def calcular_lmax_perfil_tipo_I(self, H, Hvar, So, k_linha):
+        """
+        Calcula o comprimento máximo da linha lateral em Perfil Tipo I (Aclive)
+        de forma iterativa utilizando a Equação 58 da tese.
+        L = (H * Hvar) / (k_linha * L^1.75 + So)
+        """
+        L_anterior = 10.0
+        while True:
+            # Equação 58
+            L_novo = (H * Hvar) / (k_linha * (L_anterior ** 1.75) + So)
+
+            # Condição de parada (diferença menor que 0.01 metros)
+            if abs(L_novo - L_anterior) < 0.01:
+                return round(L_novo, 2)
+
+            L_anterior = L_novo
+
     def perda_conector_lateral(self, diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms):
         """
         Calcula a Perda Localizada de Carga por conexão de entrada em MCA.
@@ -484,3 +510,30 @@ class CalculadorIrrigacao:
         hfl_l = self.perda_conector_lateral(diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms)
         pressao_inicial = pressao_emissor + perda_carga_tubulacao + hfl_l
         return pressao_inicial
+
+    def calcular_raio_umedecido(self, alpha, q, ko, se=None):
+        """
+        Calcula o Raio Umedecido (Rw) para faixa contínua baseado na Equação 26.
+        """
+        if alpha <= 0 or ko <= 0:
+            return {"rw": 0.0}
+
+        termo1 = 4 / ((alpha ** 2) * (math.pi ** 2))
+        termo2 = q / (math.pi * ko)
+        termo3 = 2 / (alpha * math.pi)
+
+        valor_interno = termo1 + termo2 - termo3
+
+        if valor_interno < 0:
+            return {"rw": 0.0}
+
+        rw = math.sqrt(valor_interno)
+        rw_arredondado = round(rw, 2)
+
+        resultado = {"rw": rw_arredondado}
+
+        if se is not None:
+            if se > 2 * rw_arredondado:
+                resultado["alerta"] = "a faixa contínua será rompida"
+
+        return resultado
