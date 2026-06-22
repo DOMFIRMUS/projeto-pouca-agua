@@ -687,6 +687,12 @@ class CalculadorIrrigacao:
 
         raise ValueError("A iteração para calcular L não convergiu após 1000 passos.")
 
+    def calcular_lmax_perfil_tipo_IIa(self, H, Hvar, So, k_linha, chute_inicial=50.0):
+        L = chute_inicial
+        iteracoes = 0
+        while iteracoes < 1000:
+            iteracoes += 1
+
     def _calcular_condicao_59(self, So, k_linha, L):
         # Condição da Equação 59
         condicao = So / (k_linha * (L ** 1.75))

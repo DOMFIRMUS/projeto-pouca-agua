@@ -3,6 +3,9 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from models.irrigacao import CalculadorIrrigacao
 import datetime
+from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_projeto_metadados, get_bancos, insert_banco, delete_banco, insert_projeto
+
+
 from database import obter_projeto_por_codigo, obter_resumo_hidraulico, init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_projeto_metadados, insert_projeto
 from database import init_db, obter_projeto_por_codigo, obter_resumo_hidraulico, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_bancos, insert_banco, delete_banco
 from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, insert_projeto
@@ -136,6 +139,7 @@ def obter_status():
     alpha = request.args.get('alpha', 1.0, type=float) # Default alpha if not given
 
     if ce_agua_ds_m > min_ce:
+        calc["analise"]["mensagem"] += " Alerta: Ocorrerá decréscimo na produtividade."
         pass # placeholder
 
     raio_umedecido_info = calculador.calcular_raio_umedecido(alpha, q, ko, se)
@@ -166,6 +170,8 @@ def obter_status():
             "numero_emissores_por_planta": calc["np_emissores"],
             "tempo_irrigacao_calculado_minutos": calc["tempo_irrigacao_calculado_minutos"],
             "fracao_lixiviacao": calc["fl"],
+            "irrigacao_total_necessaria_mm": calc["itn"],
+            "deficit_pressao_vapor_kpa": calc.get("deficit_pressao_vapor_kpa", 0.0)
             "irrigacao_total_necessaria_mm": calc["itn"]
             "irrigacao_total_necessaria_mm": calc["itn"],
         }
@@ -267,12 +273,10 @@ def processar_hidraulica():
 def perda_carga():
     dados = request.get_json()
 
-@app.route('/api/hidraulica', methods=['POST'])
-def obter_hidraulica():
-    dados_recebidos = request.get_json()
-    if not dados_recebidos:
+    if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
+    tem_perfil = any(k in dados for k in ['So', 'k_linha', 'L_estimado'])
     # Branch logic based on the incoming JSON payload parameters
     if any(k in dados for k in ['So', 'k_linha', 'L_estimado']):
         if not ('So' in dados and 'k_linha' in dados and 'L_estimado' in dados):
@@ -326,10 +330,13 @@ def obter_hidraulica():
     tem_perda = any(k in dados for k in ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m'])
 
     if not tem_perfil and not tem_perda:
-        return jsonify({"erro": "Nenhum dado válido para cálculo hidráulico foi enviado."}), 400
+        return jsonify({"erro": "Nenhum parâmetro válido enviado."}), 400
 
     resultado_final = {}
 
+    if tem_perfil:
+        if 'So' not in dados or 'k_linha' not in dados or 'L_estimado' not in dados:
+            return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
     # Lógica de Perda de Carga
     if tem_perda:
         campos_perda = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
@@ -761,12 +768,12 @@ def salvar_projeto_metadados():
             So = float(dados['So'])
             k_linha = float(dados['k_linha'])
             L_estimado = float(dados['L_estimado'])
-
             classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
             resultado_final["classificacao"] = classificacao
         except ValueError:
             return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
 
+    if tem_perda:
     return jsonify(resultado_final), 200
 
     if has_basic:
@@ -777,15 +784,28 @@ def salvar_projeto_metadados():
         for campo in campos_obrigatorios:
             if campo not in dados:
                 return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
-
         try:
             diametro_mm = float(dados['diametro_mm'])
             vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
             espacamento_m = float(dados['espacamento_m'])
             comprimento_m = float(dados['comprimento_m'])
+            resultado = calculador.calcular_perda_carga(diametro_mm, vazao_gotejador_lh, espacamento_m, comprimento_m)
+            if "erro" in resultado:
+                return jsonify(resultado), 400
+            resultado_final.update(resultado)
         except ValueError:
             return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
 
+    return jsonify(resultado_final), 200
+
+@app.route('/api/projetos', methods=['POST'])
+def criar_projeto():
+    dados = request.get_json()
+    if not dados or 'codigo_projeto' not in dados:
+        return jsonify({"erro": "O campo 'codigo_projeto' é obrigatório."}), 400
+
+    from backend.database import get_projeto_metadados, insert_projeto
+    projeto_existente = get_projeto_metadados(dados['codigo_projeto'])
         resultado = calculador.calcular_perda_carga(
             diametro_mm,
             vazao_gotejador_lh,
@@ -847,17 +867,14 @@ def salvar_projeto_metadados():
         data_elaboracao
     )
 
-    if resultado["status"] == "erro":
-        return jsonify(resultado), 409
+    if projeto_existente:
+        return jsonify({"erro": "Este Código já existe"}), 400
 
-    return jsonify(resultado), 201
     sucesso = insert_projeto(dados)
-
     if not sucesso:
         return jsonify({"erro": "Este Código já existe"}), 400
 
     return jsonify({"status": "sucesso", "mensagem": "Projeto criado com sucesso"}), 201
-
 
 @app.route('/api/relatorio-dimensionamento', methods=['GET'])
 def relatorio_dimensionamento():

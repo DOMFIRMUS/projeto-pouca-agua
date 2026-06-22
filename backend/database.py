@@ -64,54 +64,34 @@ def init_db():
             data_elaboracao TEXT
         )
     ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS projetos_metadados (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            codigo_projeto TEXT UNIQUE NOT NULL,
-            nome_projeto TEXT,
-            nome_propriedade TEXT,
-            nome_proprietario TEXT,
-            nome_projetista TEXT,
-            identificacao TEXT,
-            nome_codigo_subunidade TEXT,
-            area_total_irrigada REAL,
-            area_subunidade REAL,
-            data_elaboracao TEXT
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS bancos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            taxa_mensal REAL NOT NULL
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS projetos_metadados (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            codigo_projeto TEXT UNIQUE NOT NULL,
-            nome_projeto TEXT,
-            largura INTEGER,
-            altura INTEGER,
-            profundidade INTEGER
-        )
-    ''')
     conn.commit()
     conn.close()
 
+def insert_projeto(dados):
 def insert_projeto(codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao):
 def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, profundidade):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute('''
-            INSERT INTO projetos_metadados (codigo_projeto, nome_projeto, largura, altura, profundidade)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (codigo_projeto, nome_projeto, largura, altura, profundidade))
+            INSERT INTO projetos_metadados (
+                codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario,
+                nome_projetista, codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            dados.get('codigo_projeto'),
+            dados.get('nome_projeto'),
+            dados.get('nome_propriedade'),
+            dados.get('nome_proprietario'),
+            dados.get('nome_projetista'),
+            dados.get('codigo_subunidade'),
+            dados.get('area_total_irrigada'),
+            dados.get('area_subunidade'),
+            dados.get('data_elaboracao')
+        ))
         conn.commit()
         return True
     except sqlite3.IntegrityError:
-        # Retorna False se houver violação da constraint UNIQUE do codigo_projeto
         return False
     finally:
         conn.close()
