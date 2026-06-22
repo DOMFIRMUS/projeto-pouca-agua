@@ -33,6 +33,51 @@ class CalculadorIrrigacao:
             40: [43.3, 38.3, 30.9, 22.2, 15.8, 12.8, 13.9, 19.1, 27.1, 35.1, 41.8, 44.6],
         }
 
+        # Tabela 4 da tese: Insolação máxima (N) em horas para Latitudes Sul
+        self.tabela_n = {
+            20: [13.1, 12.7, 12.1, 11.5, 11.1, 10.8, 10.9, 11.3, 11.9, 12.5, 13.0, 13.2],
+        }
+
+    def calcular_rs(self, n_horas_sol, N_max, ra_topo):
+        """
+        Calcula a Radiação Solar na superfície (Rs) em MJ/m2/dia.
+        Equação 16 da tese: Rs = (0.25 + 0.50 * (n / N)) * Ra
+        """
+        if N_max <= 0:
+            return 0.0
+
+        rs = (0.25 + 0.50 * (n_horas_sol / N_max)) * ra_topo
+        return round(rs, 2)
+    def calcular_pressao_saturacao_es(self, t_max, t_min):
+        """
+        Calcula a Pressão de Saturação de Vapor (es) média usando o método de Penman-Monteith (FAO56).
+        Equação 14: e_o(T) = 0.6108 * exp[(17.27 * T) / (T + 273.3)]
+        Equação 13: es = (e_o(T_max) + e_o(T_min)) / 2
+        Retorna em kPa.
+        """
+        def eo(t):
+            return 0.6108 * math.exp((17.27 * t) / (t + 273.3))
+
+        eo_tmax = eo(t_max)
+        eo_tmin = eo(t_min)
+        es = (eo_tmax + eo_tmin) / 2.0
+        return es
+
+    def calcular_pressao_atual_ea(self, es, umidade_relativa_media_ur):
+        """
+        Calcula a Pressão Atual de Vapor (ea) usando a umidade relativa.
+        Equação 15: ea = es * (UR_m / 100)
+        Retorna em kPa.
+        """
+        return es * (umidade_relativa_media_ur / 100.0)
+
+    def calcular_deficit_pressao_vapor(self, es, ea):
+        """
+        Calcula o Déficit de Pressão de Vapor (es - ea).
+        Retorna em kPa.
+        """
+        return es - ea
+
     def obter_radiacao_solar_ra(self, latitude_sul, mes_index):
         """
         Obtém a radiação solar (Ra) com base na latitude sul e no mês do ano.
@@ -54,6 +99,20 @@ class CalculadorIrrigacao:
             lat_par = 40
 
         return self.tabela_ra[lat_par][mes_index - 1]
+
+    def calcular_pressao_atual_ea(self, es, umidade_relativa_media_ur):
+        """
+        Calcula a Pressão Atual de Vapor (ea) em kPa.
+        Equação 15 da Tese: ea = es * (UR_m / 100)
+        """
+        ea = es * (umidade_relativa_media_ur / 100.0)
+        return round(ea, 4)
+
+    def calcular_deficit_pressao_vapor(self, es, ea):
+        """
+        Calcula o Déficit de Pressão de Vapor (es - ea) em kPa.
+        """
+        return round(es - ea, 4)
 
     def calcular_eto_blaney_criddle(self, t_media, mes_index):
         """
@@ -140,13 +199,13 @@ class CalculadorIrrigacao:
         """
         etc = eto * kc * kl
         return round(etc, 2)
-    def calcular_itn(self, irn_mm, ce_agua_ds_m, ce_solo_min, ce_solo_max, uniformidade_emissao_decimal):
+    def calcular_itn(self, irn_mm, ce_agua_ds_m, min_ce, max_ce, uniformidade_emissao_decimal):
         """
         Calcula a Irrigação Total Necessária (ITN) e a Fração de Lixiviação (FL)
-        com base nas Equações 42 e 43 da tese.
+        com base nas Equações 42 e 43 da tese, utilizando min_ce e max_ce específicos da cultura.
         """
         # Equação 43: FL = CEa / (2 * CEes_max)
-        fl = ce_agua_ds_m / (2 * ce_solo_max)
+        fl = ce_agua_ds_m / (2 * max_ce)
 
         # Limitar o FL a valores viáveis para evitar divisão por zero ou negativa na eq. 42
         if fl >= 1.0:
@@ -225,6 +284,20 @@ class CalculadorIrrigacao:
 
         hfl_d = 0.043695 * (vel_derivacao_vd ** 1.897) * (diametro_derivacao_dd ** -2.428) * (area_protrusao_ap ** 1.109)
         return round(hfl_d, 4)
+
+    def calcular_hfl_direta_vilaca(self, v_D, D_D, A_P):
+        """
+        Calcula a Perda Localizada de Carga por Passagem Direta em conectores (Modelo de Vilaça, Eq 76).
+        """
+        if not (0.133 <= v_D <= 3.0):
+            return {"validacao_modelo_direto": "fora_dos_limites"}
+        if not (0.0357 <= D_D <= 0.0721):
+            return {"validacao_modelo_direto": "fora_dos_limites"}
+        if not (103e-6 <= A_P <= 355e-6):
+            return {"validacao_modelo_direto": "fora_dos_limites"}
+
+        hfl_d = 0.043695 * (v_D ** 1.897) * (D_D ** -2.428) * (A_P ** 1.109)
+        return round(hfl_d, 4)
     def calcular_turno_rega_max(self, irn_max_mm, etc_mm_dia, sp_m, sr_m):
         """
         Calcula o Turno de Rega Máximo (TR_max) baseado na Equação 44 da tese.
@@ -234,6 +307,22 @@ class CalculadorIrrigacao:
 
         tr_max = math.floor(irn_max_mm / (etc_mm_dia * sp_m * sr_m))
         return tr_max
+    def resolver_fator_atrito_f(self, velocidade, diametro_m):
+        """
+        Calcula o fator de atrito (f) baseado na velocidade e no diâmetro.
+        Utiliza o número de Reynolds (R) e equações para diferentes regimes de escoamento.
+        """
+        r = (velocidade * diametro_m) / 1.01e-6
+
+        if r < 2000:
+            f = 64 / r if r > 0 else 0
+        elif 2000 <= r < 3000:
+            f = 0.04
+        else:
+            f = 0.316 / (r ** 0.25)
+
+        return f
+
     def comprimento_trecho_a_trecho(self, diametro_m, vazao_emissor_m3s, espacamento_m, pressao_entrada_mca, declividade, hvar_max):
         """
         Calcula o comprimento máximo da linha lateral trecho a trecho (do último emissor para o primeiro).
@@ -248,14 +337,7 @@ class CalculadorIrrigacao:
         while True:
             vazao_acumulada_m3s = i * vazao_emissor_m3s
             v = vazao_acumulada_m3s / area
-            r = (v * diametro_m) / 1.01e-6
-
-            if r < 2000:
-                f = 64 / r if r > 0 else 0
-            elif 2000 <= r < 3000:
-                f = 0.04
-            else:
-                f = 0.316 / (r ** 0.25)
+            f = self.resolver_fator_atrito_f(v, diametro_m)
 
             hf = 8.263e-2 * f * (vazao_acumulada_m3s ** 2 / diametro_m ** 5) * espacamento_m
 
@@ -271,6 +353,34 @@ class CalculadorIrrigacao:
 
         return comprimento_total
 
+    def verificar_limite_salinidade(self, ce_agua_i, cultura_nome):
+        """
+        Filtro de proteção contra salinização do solo baseado na diretriz de manejo (pág 26 da tese).
+        Busca os limites min_ce e max_ce da cultura e verifica: CE_i <= (max_ce + min_ce) / 2
+        """
+        import sys
+        import os
+        sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+        from database import get_db_connection
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT min_ce, max_ce FROM culturas WHERE nome = ?", (cultura_nome,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            min_ce = row['min_ce']
+            max_ce = row['max_ce']
+            limite = (max_ce + min_ce) / 2.0
+            if ce_agua_i > limite:
+                return {
+                    "salinidade_critica": True,
+                    "alerta_manejo": "A salinidade da água ultrapassa a média de resiliência da cultura. Risco iminente de perda de produção."
+                }
+        return {"salinidade_critica": False}
+
     def avaliar_status_solo(self, valor_umidade):
         if valor_umidade < self.umidade_critica:
             return {"status": "Crítico (Seco)", "cor_alerta": "danger", "irrigar": True, "mensagem": "Solo excessivamente seco. Ligue a irrigação."}
@@ -281,10 +391,20 @@ class CalculadorIrrigacao:
         else:
             return {"status": "Encharcado", "cor_alerta": "info", "irrigar": False, "mensagem": "Solo muito úmido. Evite desperdiçar água."}
 
-    def calcular_perda_carga(self, diametro_mm, vazao_gotejador_lh, espacamento_m, comprimento_m):
+    def calcular_lambda(self, comprimento_equivalente_le, espacamento_emissores_se):
+        """
+        Calcula o fator de comprimento equivalente (lambda) para perdas localizadas.
+        Equação 51: lambda = (Le + Se) / Se
+        """
+        if espacamento_emissores_se <= 0:
+            return 1.0 # fallback caso espaçamento seja zero ou negativo
+        return (comprimento_equivalente_le + espacamento_emissores_se) / espacamento_emissores_se
+
+    def calcular_perda_carga(self, diametro_mm, vazao_gotejador_lh, espacamento_m, comprimento_m, comprimento_equivalente_le=0.0):
         """
         Calcula a perda de carga em uma linha lateral de gotejamento usando a equação
-        empírica para tubos plásticos pequenos (Flamant/Blasius) e aplica o fator de Christiansen.
+        empírica para tubos plásticos pequenos (Flamant/Blasius) com fator de comprimento equivalente (lambda)
+        e aplica o fator de Christiansen.
         """
         if espacamento_m <= 0:
             return {"erro": "Espaçamento deve ser maior que zero"}
@@ -305,9 +425,11 @@ class CalculadorIrrigacao:
         # Equação de Flamant/Blasius para plásticos pequenos: m = 1.75
         m = 1.75
 
-        # Equação empírica de perda de carga para tubo contínuo (hf)
-        # J = 0.000859 * Q^1.75 * D^-4.75
-        hf_continua = 0.000859 * comprimento_m * (q_m3s ** 1.75) * (d_m ** -4.75)
+        fator_lambda = self.calcular_lambda(comprimento_equivalente_le, espacamento_m)
+
+        # Equação empírica de perda de carga para tubo contínuo (hf) com fator lambda
+        # hf_continua = 2.8287e-4 * Q^1.75 * D^-4.75 * L * lambda
+        hf_continua = 2.8287e-4 * (q_m3s ** 1.75) * (d_m ** -4.75) * comprimento_m * fator_lambda
 
         # Fator de Christiansen para múltiplas saídas
         fator_f = (1 / (m + 1)) + (1 / (2 * n_emissores)) + (math.sqrt(m - 1) / (6 * n_emissores**2))
@@ -320,7 +442,8 @@ class CalculadorIrrigacao:
         return {
             "vazao_total_lh": round(vazao_total_lh, 2),
             "perda_carga_mca": round(hf_mca, 3),
-            "status": status
+            "status": status,
+            "fator_lambda": round(fator_lambda, 4)
         }
     def obter_kc_atual(self, data_plantio, dias_fases, kc_valores):
         """
@@ -417,6 +540,82 @@ class CalculadorIrrigacao:
             return round(ps, 2)
 
         return 0.0
+    def calcular_lmax_perfil_tipo_IId(self, H, Hvar, So, k_linha, L_inicial=50.0):
+        """
+        Calcula o comprimento máximo (L) para o Perfil Tipo II-d (Declive Muito Forte).
+        Valida a restrição de limite físico da Equação 66 e implementa a Equação 67 da tese iterativamente.
+        """
+        L_atual = L_inicial
+    def calcular_lmax_perfil_tipo_IIc(self, H, Hvar, So, k_linha, L_inicial=50.0):
+        """
+        Calcula o comprimento máximo L para o Perfil Tipo II-c (Declive Forte).
+        Resolução iterativa da Equação 65 e validação da Equação 64 da tese.
+        """
+        L = L_inicial
+
+        for _ in range(1000):
+            L_novo = (Hvar + (k_linha * (L ** 2.75)) / 2.75) / So
+            if abs(L_novo - L) < 1e-4:
+                L_round = round(L_novo, 3)
+                # Validar a condição de existência baseada na Equação 64 da tese
+                razao = So / (k_linha * (L_round ** 1.75))
+                if 1 < razao < 2.75:
+                    return L_round
+                else:
+                    raise ValueError(f"Condição de existência falhou: razão {razao:.4f} fora do intervalo (1, 2.75)")
+            L = L_novo
+
+        raise ValueError("O loop iterativo não estabilizou em três casas decimais.")
+    def calcular_lmax_perfil_tipo_IIa(self, H, Hvar, So, k_linha, L_inicial=50.0):
+        """
+        Determina o Comprimento Máximo da Linha Lateral sob o Perfil Tipo II-a (Declive Fraco).
+        Utiliza o algoritmo de aproximações sucessivas baseado nas equações 59, 60 e 61 da tese.
+        """
+        L = L_inicial
+        iteracoes = 0
+        max_iteracoes = 1000
+
+        while iteracoes < max_iteracoes:
+            razao = So / (k_linha * (L_atual ** 1.75))
+            if razao < 2.75:
+                raise ValueError(f"Restrição de limite físico não atendida (Equação 66): S0 / (k' * L^1.75) = {razao:.4f} < 2.75. O ganho por desnível não supera totalmente a perda por atrito em todas as seções.")
+
+            L_novo = (H * Hvar) / ((So - k_linha * (L_atual ** 1.75)) * (1 - Hvar))
+
+            if abs(L_novo - L_atual) < 0.001:
+                return L_novo
+
+            L_atual = L_novo
+            iteracoes += 1
+
+        raise ValueError("A iteração para calcular L não convergiu após 1000 passos.")
+            iteracoes += 1
+
+            # Condição da Equação 59
+            condicao = So / (k_linha * (L ** 1.75))
+            if not (0 < condicao < 1):
+                raise ValueError(f"Condição da Equação 59 não satisfeita (deve estar entre 0 e 1): {condicao}")
+
+            # Equação 61
+            razao_lL = 1 - 0.56098 * (condicao ** 0.57143)
+
+            # Equação 60
+            numerador = H * Hvar
+            denominador = ((1 - ((1 - razao_lL) ** 2.35)) * k_linha * (L ** 1.33)) - (razao_lL * So)
+
+            if denominador == 0:
+                 raise ZeroDivisionError("Divisão por zero ao calcular o novo comprimento L.")
+
+            L_novo = numerador / denominador
+
+            # Critério de paragem
+            if abs(L_novo - L) < 0.001:
+                return round(L_novo, 3)
+
+            L = L_novo
+
+        raise Exception("O cálculo não convergiu após o número máximo de iterações.")
+
     def classificar_perfil_pressao(self, So, k_linha, L_estimado):
         """
         Classifica o perfil de pressão hidráulica baseado na tese.
@@ -438,6 +637,138 @@ class CalculadorIrrigacao:
             return 'Perfil Tipo IIc (Declive Forte)'
         else:
             return 'Perfil Tipo IId (Declive Muito Forte)'
+
+    def calcular_lmax_perfil_tipo_IIb(self, H, Hvar, So, k_linha, L_estimado):
+        """
+        Calcula o Comprimento Máximo da Linha Lateral para Perfil Tipo II-b.
+        Verifica a condição de ocorrência do Perfil Tipo II-b pela Equação 62 da tese: (k' * L^1.75) / So = 1
+        E aplica a Equação 63 se a condição for atendida.
+        """
+        if So <= 0:
+            return None
+
+        razao = (k_linha * (L_estimado ** 1.75)) / So
+
+        if math.isclose(razao, 1.0, rel_tol=1e-4, abs_tol=1e-4):
+            # Equação 63: L = (H * Hvar) / (0.357 * So)
+            L = (H * Hvar) / (0.357 * So)
+            return L
+
+        return None
+    def orquestrar_dimensionamento_declive(self, H, Hvar, So, k_linha):
+        """
+        Orquestrador de busca de perfis hidráulicos segundo a página 37 da tese.
+        """
+        def eval_ratio(So, k_linha, L):
+            if isinstance(L, complex):
+                L = L.real
+            denom = k_linha * (abs(L) ** 1.75)
+            if denom == 0: denom = 1e-6
+            return So / denom
+
+        if So > 0:
+            # Passo 1: Perfil Tipo II-a (Declive Fraco)
+            L = 50.0
+            for _ in range(500):
+                if isinstance(L, complex): L = L.real
+                L = abs(L)
+                ratio = eval_ratio(So, k_linha, L)
+                base_ratio = max(0, ratio)
+                razao_lL = 1 - 0.56098 * (base_ratio ** 0.57143)
+
+                base_term = max(0, 1 - razao_lL)
+
+                denom = (((1 - (base_term ** 2.35)) * k_linha * (L ** 1.33)) - (razao_lL * So))
+                if denom == 0: denom = 1e-6
+
+                L_novo = (H * Hvar) / denom
+
+                if abs(L_novo - L) < 0.001:
+                    L = L_novo
+                    break
+                L = L_novo
+
+            ratio = eval_ratio(So, k_linha, L)
+            if 0 < ratio < 1:
+                return {"comprimento_l_m": round(L.real, 2), "perfil_classificado": "Perfil Tipo II-a (Declive Fraco)"}
+
+            # Passo 2: Perfil Tipo II-c (Declive Forte)
+            L = 50.0
+            for _ in range(500):
+                if isinstance(L, complex): L = L.real
+                L = abs(L)
+                ratio = eval_ratio(So, k_linha, L)
+                base_ratio = max(0, ratio)
+                razao_lL = 1 - 0.56098 * (base_ratio ** 0.57143)
+                base_term = max(0, 1 - razao_lL)
+
+                k_L175 = k_linha * (L ** 1.75)
+                denom = So - k_L175 + (1 - (base_term**2.75)) * k_L175 - Hvar * (So - k_L175)
+                if denom == 0: denom = 1e-6
+                L_novo = (H * Hvar) / denom
+
+                if abs(L_novo - L) < 0.001:
+                    L = L_novo
+                    break
+                L = L_novo
+
+            ratio = eval_ratio(So, k_linha, L)
+            if 1 < ratio < 2.75:
+                return {"comprimento_l_m": round(L.real, 2), "perfil_classificado": "Perfil Tipo II-c (Declive Forte)"}
+
+            # Passo 3: Perfil Tipo II-d (Declive Muito Forte)
+            L = 50.0
+            for _ in range(500):
+                if isinstance(L, complex): L = L.real
+                L = abs(L)
+                k_L175 = k_linha * (L ** 1.75)
+                denom = (So - k_L175) * (1 - Hvar)
+                if denom == 0: denom = 1e-6
+                L_novo = (H * Hvar) / denom
+
+                if abs(L_novo - L) < 0.001:
+                    L = L_novo
+                    break
+                L = L_novo
+
+            ratio = eval_ratio(So, k_linha, L)
+            if ratio >= 2.75:
+                return {"comprimento_l_m": round(L.real, 2), "perfil_classificado": "Perfil Tipo II-d (Declive Muito Forte)"}
+
+        # Passo 4: Fallback (Perfil Tipo I/III - Nível ou Aclive)
+        L = 50.0
+        for _ in range(500):
+            if isinstance(L, complex): L = L.real
+            L = abs(L)
+            k_L175 = k_linha * (L ** 1.75)
+            denom = k_L175 + So
+            if denom == 0: denom = 1e-6
+            L_novo = (H * Hvar) / denom
+
+            if abs(L_novo - L) < 0.001:
+                L = L_novo
+                break
+            L = L_novo
+
+        if isinstance(L, complex): L = L.real
+        return {"comprimento_l_m": round(L, 2), "perfil_classificado": "Perfil Tipo I/III (Nível ou Aclive)"}
+    def calcular_lmax_perfil_tipo_I(self, H, Hvar, So, k_linha):
+        """
+        Calcula o comprimento máximo da linha lateral em Perfil Tipo I (Aclive)
+        de forma iterativa utilizando a Equação 58 da tese.
+        L = (H * Hvar) / (k_linha * L^1.75 + So)
+        """
+        L_anterior = 10.0
+        while True:
+            # Equação 58
+            L_novo = (H * Hvar) / (k_linha * (L_anterior ** 1.75) + So)
+
+            # Condição de parada (diferença menor que 0.01 metros)
+            if abs(L_novo - L_anterior) < 0.01:
+                return round(L_novo, 2)
+
+            L_anterior = L_novo
+
     def perda_conector_lateral(self, diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms):
         """
         Calcula a Perda Localizada de Carga por conexão de entrada em MCA.
@@ -445,6 +776,51 @@ class CalculadorIrrigacao:
         """
         hfl_l = 2.268121 * (diametro_conector_m ** 0.106) * (comprimento_conector_m ** 1.057) * (vel_conector_ms ** 1.766) * (vel_lateral_ms ** 0.386)
         return hfl_l
+
+    def calcular_hfl_lateral_vilaca(self, D_C, L_C, v_C, v_L):
+        """
+        Calcula a perda localizada de carga decorrente da mudança de direção do fluxo na inserção da linha lateral.
+        Implementa a Equação 77 da tese.
+        """
+        if not (0.0078 <= D_C <= 0.0167):
+            raise ValueError(f"D_C ({D_C}) fora da faixa permitida (0.0078 - 0.0167 m).")
+        if not (0.0495 <= L_C <= 0.0664):
+            raise ValueError(f"L_C ({L_C}) fora da faixa permitida (0.0495 - 0.0664 m).")
+        if not (0.267 <= v_C <= 14.378):
+            raise ValueError(f"v_C ({v_C}) fora da faixa permitida (0.267 - 14.378 m/s).")
+        if not (0.132 <= v_L <= 3.0):
+            raise ValueError(f"v_L ({v_L}) fora da faixa permitida (0.132 - 3.0 m/s).")
+
+        hfl_l = 2.268121 * (D_C ** 0.106) * (L_C ** 1.057) * (v_C ** 1.766) * (v_L ** 0.386)
+        return hfl_l
+    def perda_conector_zitterell(self, die, dis, lc, dt, vt):
+        """
+        Calcula a perda localizada de carga em conectores de linhas laterais usando o modelo de Zitterell (2011).
+
+        Parâmetros:
+        die (float): Diâmetro interno de entrada do conector (mm)
+        dis (float): Diâmetro interno de saída do conector (mm)
+        lc (float): Comprimento do conector (mm)
+        dt (float): Diâmetro interno do tubo (mm)
+        vt (float): Velocidade média de escoamento no tubo (m/s)
+
+        Retorna:
+        tuple: (hfc, aviso) onde hfc é a perda de carga (mca) e aviso é uma string ou None.
+        """
+        aviso = None
+
+        # Limites do modelo
+        if not (2.318 <= die <= 7.900) or \
+           not (2.318 <= dis <= 12.006) or \
+           not (21.483 <= lc <= 65.046) or \
+           not (4.050 <= dt <= 12.854) or \
+           not (0.363 <= vt <= 7.580):
+            aviso = "Aviso de precisão reduzida"
+
+        # Equação 72: Hf_c = 0.000141 * D_{ie}^{-5.739} * D_{is}^{2.156} * L_c^{0.925} * D_t^{1.756} * V_t^{1.971}
+        hfc = 0.000141 * (die ** -5.739) * (dis ** 2.156) * (lc ** 0.925) * (dt ** 1.756) * (vt ** 1.971)
+
+        return hfc, aviso
 
     def calcular_pressao_inicial_bomba(self, pressao_emissor, perda_carga_tubulacao, diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms):
         """
@@ -454,3 +830,177 @@ class CalculadorIrrigacao:
         hfl_l = self.perda_conector_lateral(diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms)
         pressao_inicial = pressao_emissor + perda_carga_tubulacao + hfl_l
         return pressao_inicial
+
+    def selecionar_tubo_comercial_otimo(self, diametro_teorico, f, Q, L, dz):
+        """
+        Escolha de tubos comerciais por aproximação de menor módulo descrita na página 40 da tese.
+        """
+        diametros_comerciais = [0.025, 0.032, 0.040, 0.050, 0.063, 0.075]
+
+        inferiores = [d for d in diametros_comerciais if d <= diametro_teorico]
+        superiores = [d for d in diametros_comerciais if d >= diametro_teorico]
+
+        d_inferior = inferiores[-1] if inferiores else diametros_comerciais[0]
+        d_superior = superiores[0] if superiores else diametros_comerciais[-1]
+
+        tubos_selecionados = list(set([d_inferior, d_superior]))
+
+        melhor_d = None
+        menor_erro = float('inf')
+
+        for d in tubos_selecionados:
+            hf = 8.263e-2 * f * (Q ** 2) / (d ** 5) * L
+            erro = abs(hf - dz)
+            if erro < menor_erro:
+                menor_erro = erro
+                melhor_d = d
+
+        return melhor_d
+    def calcular_rn(self, t_max_c, t_min_c, ea, rs, rso, rns):
+        """
+        Calcula a Radiação de Onda Longa (Rnl) e o Saldo de Radiação (Rn)
+        utilizando o balanço de energia do modelo Penman-Monteith.
+        """
+        if rso <= 0:
+            return 0.0, 0.0
+
+        if ea < 0:
+            ea = 0.0
+
+        t_max_k = t_max_c + 273.16
+        t_min_k = t_min_c + 273.16
+        sigma = 4.903e-9
+
+        # Equação 19
+        termo_temperatura = (sigma * (t_max_k ** 4) + sigma * (t_min_k ** 4)) / 2.0
+        termo_umidade = 0.34 - 0.14 * math.sqrt(ea)
+        termo_nebulosidade = 1.35 * (rs / rso) - 0.35
+
+        r_nl = termo_temperatura * termo_umidade * termo_nebulosidade
+
+        # Equação 20
+        r_n = rns - r_nl
+
+        return r_nl, r_n
+    def calcular_rns(self, rs, ra, altitude_m):
+        """
+        Calcula a Radiação Solar de Céu Claro (Rso) e a Radiação Líquida de Onda Curta (Rns).
+        Equação 17: Rso = [0.75 + 2 * (Altitude / 100000)] * Ra
+        Equação 18: Rns = 0.77 * Rs
+        Mantém a unidade: MJ * m^-2 * d^-1
+        """
+        rso = (0.75 + 2 * (altitude_m / 100000)) * ra
+        rns = 0.77 * rs
+        return round(rso, 2), round(rns, 2)
+    def calcular_constante_psicrometrica(self, altitude_z):
+        """
+        Calcula a Pressão Atmosférica (P) e a Constante Psicrométrica (γ)
+        com base na altitude z (metros) usando as Equações 22 e 23 da tese.
+        """
+        if altitude_z < 0:
+            altitude_z = 0
+
+        # Equação 22: P = 101.3 * (((293 - 0.0065 * z) / 293) ^ 5.26)
+        p_kpa = 101.3 * (((293 - 0.0065 * altitude_z) / 293) ** 5.26)
+
+        # Equação 23: gamma = 0.665 * 10^-3 * P
+        gamma = (0.665 * (10 ** -3)) * p_kpa
+
+        return round(p_kpa, 2), round(gamma, 6)
+    def validar_criterio_pressao_subunidade(self, perda_carga_total_hf, pressao_entrada_h):
+        """
+        Validador de uniformidade de descarga hidráulica na subunidade baseando-se
+        nas restrições de projeto da página 28 da tese.
+        """
+        if pressao_entrada_h <= 0:
+            return {"status_hidraulico": "ERRO", "classe": "Pressão de entrada deve ser maior que zero."}
+
+        hvar_real = (perda_carga_total_hf / pressao_entrada_h) * 100.0
+
+        if hvar_real <= 20.0:
+            return {
+                "status_hidraulico": "ACEITAVEL",
+                "classe": "Uniformidade de gotejamento excelente de acordo com os critérios do modelo computacional"
+            }
+        else:
+            return {
+                "status_hidraulico": "REJEITADO",
+                "classe": "Desuniformidade Elevada. A variação de pressão viola o limite máximo de 20% estabelecido na tese. Reduza o comprimento ou aumente o diâmetro do tubo."
+            }
+    def otimizar_escalonamento_rega(self, irn_max, etc, sp, sr, itn, vazao_gotejador, emissores_planta):
+        """
+        Otimiza o tempo e turno de rega.
+        """
+        if etc <= 0 or sp <= 0 or sr <= 0 or emissores_planta <= 0 or vazao_gotejador <= 0:
+            return 0, 0.0, 0
+
+        # Turno de Rega Máximo (Equação 44)
+        tr_max = math.floor(irn_max / (etc * sp * sr))
+
+        # Tempo de Irrigação (TI) em horas (Equação 45)
+        ti_horas = (itn * sp * sr) / (emissores_planta * vazao_gotejador)
+
+        # Número ideal de subunidades de campo
+        num_subunidades_sugeridas = 0
+        if ti_horas > 0:
+            num_subunidades_sugeridas = math.floor(24.0 / ti_horas)
+
+        return tr_max, ti_horas, num_subunidades_sugeridas
+    def calcular_raio_umedecido(self, alpha, q, ko, se):
+        """
+        Calcula o raio umedecido (Rw) pela Equação 26 e verifica se a faixa contínua é rompida.
+        """
+        import math
+
+        if alpha <= 0 or ko <= 0:
+            return {"erro": "Alpha e Ko devem ser maiores que zero."}
+
+        term1 = 4 / ((alpha**2) * (math.pi**2))
+        term2 = q / (math.pi * ko)
+        term3 = 2 / (alpha * math.pi)
+
+        inside_sqrt = term1 + term2 - term3
+
+        if inside_sqrt < 0:
+            return {"erro": "Valores resultam em raiz quadrada negativa."}
+
+        rw = math.sqrt(inside_sqrt)
+
+        alerta = False
+        mensagem = ""
+
+        if se > (2 * rw):
+            alerta = True
+            mensagem = "Afastamento excessivo entre gotejadores. A faixa contínua de humidade será rompida, prejudicando as raízes."
+
+        return {
+            "rw": round(rw, 4),
+            "alerta_faixa_descontinua": alerta,
+            "mensagem": mensagem
+        }
+    def calcular_raio_umedecido(self, alpha, q, ko, se=None):
+        """
+        Calcula o Raio Umedecido (Rw) para faixa contínua baseado na Equação 26.
+        """
+        if alpha <= 0 or ko <= 0:
+            return {"rw": 0.0}
+
+        termo1 = 4 / ((alpha ** 2) * (math.pi ** 2))
+        termo2 = q / (math.pi * ko)
+        termo3 = 2 / (alpha * math.pi)
+
+        valor_interno = termo1 + termo2 - termo3
+
+        if valor_interno < 0:
+            return {"rw": 0.0}
+
+        rw = math.sqrt(valor_interno)
+        rw_arredondado = round(rw, 2)
+
+        resultado = {"rw": rw_arredondado}
+
+        if se is not None:
+            if se > 2 * rw_arredondado:
+                resultado["alerta"] = "a faixa contínua será rompida"
+
+        return resultado
