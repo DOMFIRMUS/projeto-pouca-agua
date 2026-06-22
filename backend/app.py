@@ -100,6 +100,7 @@ def _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agu
         sp_m=dados_sistema["espacamento_plantas_m"],
         sr_m=dados_sistema["espacamento_fileiras_m"]
     )
+
     # Verifica se foi enviada a condutividade elétrica da água via query params
     ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
 
@@ -134,6 +135,12 @@ def _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agu
     tempo_irrigacao_horas = tempo_irrigacao_calculado_minutos / 60.0
     agenda_rega = calculador.fracionar_tempo_irrigacao(tempo_irrigacao_horas)
 
+    # Cálculo da Pressão Atual de Vapor e Déficit de Pressão de Vapor
+    # Usando valores de placeholder para Pressão de Saturação (es) e Umidade Relativa (ur)
+    es_placeholder = 2.4
+    ur_placeholder = 60.0
+    ea = calculador.calcular_pressao_atual_ea(es_placeholder, ur_placeholder)
+    deficit_pressao_vapor_kpa = calculador.calcular_deficit_pressao_vapor(es_placeholder, ea)
     try:
         comprimento_lateral_m = calculador.comprimento_trecho_a_trecho(
             diametro_m=dados_sistema.get("diametro_lateral_m", 0.016),
@@ -267,6 +274,15 @@ def obter_status():
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "irrigacao_total_necessaria_mm": itn,
+            "deficit_pressao_vapor_kpa": deficit_pressao_vapor_kpa
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
@@ -361,6 +377,9 @@ def perda_carga():
         for campo in campos_perda:
             if campo not in dados:
                 return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
+    if 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
+        if not ('So' in dados and 'k_linha' in dados and 'L_estimado' in dados):
+            return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
 
     # Verifica se os campos correspondem à segunda rota (perfil de pressão)
     if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
@@ -376,6 +395,10 @@ def perda_carga():
             return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
 
         classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+
+        return jsonify({"classificacao": classificacao}), 200
+
+    campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
         return jsonify({"classificacao": classificacao}), 200
 
     # Verifica erro específico para testes que testam apenas alguns dos campos So, k_linha, L_estimado (fallback compatibility for tests)
@@ -435,7 +458,34 @@ def perda_carga():
         if campo not in dados:
             return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
 
+    try:
+        diametro_mm = float(dados['diametro_mm'])
+        vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
+        espacamento_m = float(dados['espacamento_m'])
+        comprimento_m = float(dados['comprimento_m'])
+        comprimento_equivalente_le = float(dados.get('comprimento_equivalente_le', 0.0))
+        pressao_entrada_mca = float(dados.get('pressao_entrada_mca', 10.0))
+    except ValueError:
+        return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
+
+    resultado = calculador.calcular_perda_carga(
+        diametro_mm,
+        vazao_gotejador_lh,
+        espacamento_m,
+        comprimento_m,
+        comprimento_equivalente_le
+    )
+
+    if "erro" in resultado:
+        return jsonify(resultado), 400
     return jsonify({"erro": "Parâmetros inválidos"}), 400
+
+    validacao = calculador.validar_criterio_pressao_subunidade(
+        resultado['perda_carga_mca'],
+        pressao_entrada_mca
+    )
+
+    resultado.update(validacao)
 
     return jsonify(resultado), 200
 
@@ -444,6 +494,8 @@ def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
 
+@app.route('/api/hidraulica/perfil', methods=['POST'])
+@app.route('/api/hidraulica_perfil', methods=['POST'])
 @app.route('/api/classificar_hidraulica', methods=['POST'])
 
 

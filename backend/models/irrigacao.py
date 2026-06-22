@@ -85,6 +85,20 @@ class CalculadorIrrigacao:
 
         return self.tabela_ra[lat_par][mes_index - 1]
 
+    def calcular_pressao_atual_ea(self, es, umidade_relativa_media_ur):
+        """
+        Calcula a Pressão Atual de Vapor (ea) em kPa.
+        Equação 15 da Tese: ea = es * (UR_m / 100)
+        """
+        ea = es * (umidade_relativa_media_ur / 100.0)
+        return round(ea, 4)
+
+    def calcular_deficit_pressao_vapor(self, es, ea):
+        """
+        Calcula o Déficit de Pressão de Vapor (es - ea) em kPa.
+        """
+        return round(es - ea, 4)
+
     def calcular_eto_blaney_criddle(self, t_media, mes_index):
         """
         Calcula a Evapotranspiração de Referência (ETo em mm/dia) usando o método de Blaney-Criddle-FAO.
@@ -348,10 +362,20 @@ class CalculadorIrrigacao:
         else:
             return {"status": "Encharcado", "cor_alerta": "info", "irrigar": False, "mensagem": "Solo muito úmido. Evite desperdiçar água."}
 
-    def calcular_perda_carga(self, diametro_mm, vazao_gotejador_lh, espacamento_m, comprimento_m):
+    def calcular_lambda(self, comprimento_equivalente_le, espacamento_emissores_se):
+        """
+        Calcula o fator de comprimento equivalente (lambda) para perdas localizadas.
+        Equação 51: lambda = (Le + Se) / Se
+        """
+        if espacamento_emissores_se <= 0:
+            return 1.0 # fallback caso espaçamento seja zero ou negativo
+        return (comprimento_equivalente_le + espacamento_emissores_se) / espacamento_emissores_se
+
+    def calcular_perda_carga(self, diametro_mm, vazao_gotejador_lh, espacamento_m, comprimento_m, comprimento_equivalente_le=0.0):
         """
         Calcula a perda de carga em uma linha lateral de gotejamento usando a equação
-        empírica para tubos plásticos pequenos (Flamant/Blasius) e aplica o fator de Christiansen.
+        empírica para tubos plásticos pequenos (Flamant/Blasius) com fator de comprimento equivalente (lambda)
+        e aplica o fator de Christiansen.
         """
         if espacamento_m <= 0:
             return {"erro": "Espaçamento deve ser maior que zero"}
@@ -372,9 +396,11 @@ class CalculadorIrrigacao:
         # Equação de Flamant/Blasius para plásticos pequenos: m = 1.75
         m = 1.75
 
-        # Equação empírica de perda de carga para tubo contínuo (hf)
-        # J = 0.000859 * Q^1.75 * D^-4.75
-        hf_continua = 0.000859 * comprimento_m * (q_m3s ** 1.75) * (d_m ** -4.75)
+        fator_lambda = self.calcular_lambda(comprimento_equivalente_le, espacamento_m)
+
+        # Equação empírica de perda de carga para tubo contínuo (hf) com fator lambda
+        # hf_continua = 2.8287e-4 * Q^1.75 * D^-4.75 * L * lambda
+        hf_continua = 2.8287e-4 * (q_m3s ** 1.75) * (d_m ** -4.75) * comprimento_m * fator_lambda
 
         # Fator de Christiansen para múltiplas saídas
         fator_f = (1 / (m + 1)) + (1 / (2 * n_emissores)) + (math.sqrt(m - 1) / (6 * n_emissores**2))
@@ -387,7 +413,8 @@ class CalculadorIrrigacao:
         return {
             "vazao_total_lh": round(vazao_total_lh, 2),
             "perda_carga_mca": round(hf_mca, 3),
-            "status": status
+            "status": status,
+            "fator_lambda": round(fator_lambda, 4)
         }
     def obter_kc_atual(self, data_plantio, dias_fases, kc_valores):
         """
@@ -506,6 +533,23 @@ class CalculadorIrrigacao:
         else:
             return 'Perfil Tipo IId (Declive Muito Forte)'
 
+    def calcular_lmax_perfil_tipo_IIb(self, H, Hvar, So, k_linha, L_estimado):
+        """
+        Calcula o Comprimento Máximo da Linha Lateral para Perfil Tipo II-b.
+        Verifica a condição de ocorrência do Perfil Tipo II-b pela Equação 62 da tese: (k' * L^1.75) / So = 1
+        E aplica a Equação 63 se a condição for atendida.
+        """
+        if So <= 0:
+            return None
+
+        razao = (k_linha * (L_estimado ** 1.75)) / So
+
+        if math.isclose(razao, 1.0, rel_tol=1e-4, abs_tol=1e-4):
+            # Equação 63: L = (H * Hvar) / (0.357 * So)
+            L = (H * Hvar) / (0.357 * So)
+            return L
+
+        return None
     def orquestrar_dimensionamento_declive(self, H, Hvar, So, k_linha):
         """
         Orquestrador de busca de perfis hidráulicos segundo a página 37 da tese.
@@ -628,6 +672,22 @@ class CalculadorIrrigacao:
         hfl_l = 2.268121 * (diametro_conector_m ** 0.106) * (comprimento_conector_m ** 1.057) * (vel_conector_ms ** 1.766) * (vel_lateral_ms ** 0.386)
         return hfl_l
 
+    def calcular_hfl_lateral_vilaca(self, D_C, L_C, v_C, v_L):
+        """
+        Calcula a perda localizada de carga decorrente da mudança de direção do fluxo na inserção da linha lateral.
+        Implementa a Equação 77 da tese.
+        """
+        if not (0.0078 <= D_C <= 0.0167):
+            raise ValueError(f"D_C ({D_C}) fora da faixa permitida (0.0078 - 0.0167 m).")
+        if not (0.0495 <= L_C <= 0.0664):
+            raise ValueError(f"L_C ({L_C}) fora da faixa permitida (0.0495 - 0.0664 m).")
+        if not (0.267 <= v_C <= 14.378):
+            raise ValueError(f"v_C ({v_C}) fora da faixa permitida (0.267 - 14.378 m/s).")
+        if not (0.132 <= v_L <= 3.0):
+            raise ValueError(f"v_L ({v_L}) fora da faixa permitida (0.132 - 3.0 m/s).")
+
+        hfl_l = 2.268121 * (D_C ** 0.106) * (L_C ** 1.057) * (v_C ** 1.766) * (v_L ** 0.386)
+        return hfl_l
     def perda_conector_zitterell(self, die, dis, lc, dt, vt):
         """
         Calcula a perda localizada de carga em conectores de linhas laterais usando o modelo de Zitterell (2011).
@@ -666,6 +726,77 @@ class CalculadorIrrigacao:
         pressao_inicial = pressao_emissor + perda_carga_tubulacao + hfl_l
         return pressao_inicial
 
+    def calcular_rn(self, t_max_c, t_min_c, ea, rs, rso, rns):
+        """
+        Calcula a Radiação de Onda Longa (Rnl) e o Saldo de Radiação (Rn)
+        utilizando o balanço de energia do modelo Penman-Monteith.
+        """
+        if rso <= 0:
+            return 0.0, 0.0
+
+        if ea < 0:
+            ea = 0.0
+
+        t_max_k = t_max_c + 273.16
+        t_min_k = t_min_c + 273.16
+        sigma = 4.903e-9
+
+        # Equação 19
+        termo_temperatura = (sigma * (t_max_k ** 4) + sigma * (t_min_k ** 4)) / 2.0
+        termo_umidade = 0.34 - 0.14 * math.sqrt(ea)
+        termo_nebulosidade = 1.35 * (rs / rso) - 0.35
+
+        r_nl = termo_temperatura * termo_umidade * termo_nebulosidade
+
+        # Equação 20
+        r_n = rns - r_nl
+
+        return r_nl, r_n
+    def calcular_rns(self, rs, ra, altitude_m):
+        """
+        Calcula a Radiação Solar de Céu Claro (Rso) e a Radiação Líquida de Onda Curta (Rns).
+        Equação 17: Rso = [0.75 + 2 * (Altitude / 100000)] * Ra
+        Equação 18: Rns = 0.77 * Rs
+        Mantém a unidade: MJ * m^-2 * d^-1
+        """
+        rso = (0.75 + 2 * (altitude_m / 100000)) * ra
+        rns = 0.77 * rs
+        return round(rso, 2), round(rns, 2)
+    def calcular_constante_psicrometrica(self, altitude_z):
+        """
+        Calcula a Pressão Atmosférica (P) e a Constante Psicrométrica (γ)
+        com base na altitude z (metros) usando as Equações 22 e 23 da tese.
+        """
+        if altitude_z < 0:
+            altitude_z = 0
+
+        # Equação 22: P = 101.3 * (((293 - 0.0065 * z) / 293) ^ 5.26)
+        p_kpa = 101.3 * (((293 - 0.0065 * altitude_z) / 293) ** 5.26)
+
+        # Equação 23: gamma = 0.665 * 10^-3 * P
+        gamma = (0.665 * (10 ** -3)) * p_kpa
+
+        return round(p_kpa, 2), round(gamma, 6)
+    def validar_criterio_pressao_subunidade(self, perda_carga_total_hf, pressao_entrada_h):
+        """
+        Validador de uniformidade de descarga hidráulica na subunidade baseando-se
+        nas restrições de projeto da página 28 da tese.
+        """
+        if pressao_entrada_h <= 0:
+            return {"status_hidraulico": "ERRO", "classe": "Pressão de entrada deve ser maior que zero."}
+
+        hvar_real = (perda_carga_total_hf / pressao_entrada_h) * 100.0
+
+        if hvar_real <= 20.0:
+            return {
+                "status_hidraulico": "ACEITAVEL",
+                "classe": "Uniformidade de gotejamento excelente de acordo com os critérios do modelo computacional"
+            }
+        else:
+            return {
+                "status_hidraulico": "REJEITADO",
+                "classe": "Desuniformidade Elevada. A variação de pressão viola o limite máximo de 20% estabelecido na tese. Reduza o comprimento ou aumente o diâmetro do tubo."
+            }
     def otimizar_escalonamento_rega(self, irn_max, etc, sp, sr, itn, vazao_gotejador, emissores_planta):
         """
         Otimiza o tempo e turno de rega.

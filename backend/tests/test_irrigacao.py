@@ -67,11 +67,18 @@ def test_calcular_irn_e_cad():
 
 def test_calcular_perda_carga():
     calc = CalculadorIrrigacao()
-    # Test valid input
+    # Test valid input sem comprimento equivalente (lambda = 1.0)
     resultado = calc.calcular_perda_carga(16, 2, 0.5, 50)
     assert resultado["vazao_total_lh"] == 200.0
     assert "perda_carga_mca" in resultado
+    assert resultado["perda_carga_mca"] == 0.063
     assert resultado["status"] in ["Aceitável", "Desuniformidade Elevada"]
+    assert resultado["fator_lambda"] == 1.0
+
+    # Test valid input com comprimento equivalente (ex: Le = 0.25 -> lambda = (0.25+0.5)/0.5 = 1.5)
+    resultado_le = calc.calcular_perda_carga(16, 2, 0.5, 50, 0.25)
+    assert resultado_le["fator_lambda"] == 1.5
+    assert resultado_le["perda_carga_mca"] == 0.095
 
     # Test invalid input (espacamento <= 0)
     resultado_erro1 = calc.calcular_perda_carga(16, 2, 0, 50)
@@ -137,6 +144,32 @@ def test_classificar_perfil_pressao():
     # So = 3.0 -> razao = 3.0
     assert calc.classificar_perfil_pressao(3.0, 1, 1) == 'Perfil Tipo IId (Declive Muito Forte)'
     assert calc.classificar_perfil_pressao(2.75, 1, 1) == 'Perfil Tipo IId (Declive Muito Forte)'
+
+def test_calcular_lmax_perfil_tipo_IIb():
+    calc = CalculadorIrrigacao()
+
+    # Test condition met: razao = 1.0 -> (k_linha * (L_estimado ** 1.75)) / So = 1
+    # Let L_estimado = 1, k_linha = 1, So = 1
+    # H = 10, Hvar = 2
+    # Result: L = (10 * 2) / (0.357 * 1) = 20 / 0.357 ~= 56.0224
+    result = calc.calcular_lmax_perfil_tipo_IIb(10, 2, 1, 1, 1)
+    assert result is not None
+    assert round(result, 4) == 56.0224
+
+    # Test condition met using float tolerance: razao = 1.00005
+    # So = 0.99995
+    result2 = calc.calcular_lmax_perfil_tipo_IIb(10, 2, 0.99995, 1, 1)
+    assert result2 is not None
+    assert round(result2, 4) == 56.0252
+
+    # Test condition not met: razao != 1
+    # So = 0.5 -> razao = 2.0
+    result3 = calc.calcular_lmax_perfil_tipo_IIb(10, 2, 0.5, 1, 1)
+    assert result3 is None
+
+    # Test condition So <= 0
+    result4 = calc.calcular_lmax_perfil_tipo_IIb(10, 2, 0, 1, 1)
+    assert result4 is None
 
 def test_calcular_itn():
     calc = CalculadorIrrigacao()
@@ -394,6 +427,71 @@ def test_calcular_pressao_inicial_bomba():
     assert isinstance(pressao, float)
     assert round(pressao, 3) == 12.126
 
+def test_calcular_rn():
+    calc = CalculadorIrrigacao()
+    # Case 1: Normal conditions
+    t_max_c = 30.0
+    t_min_c = 20.0
+    ea = 2.0
+    rs = 20.0
+    rso = 25.0
+    rns = 15.0
+
+    r_nl, r_n = calc.calcular_rn(t_max_c, t_min_c, ea, rs, rso, rns)
+
+    assert isinstance(r_nl, float)
+    assert isinstance(r_n, float)
+
+    # We assert closeness rather than strict equality due to floats
+    # Test values obtained from previous run on exactly the same equation:
+    # (4.023775219015518, 10.97622478098448)
+    assert round(r_nl, 4) == 4.0238
+    assert round(r_n, 4) == 10.9762
+
+    # Case 2: rso = 0 -> should return 0.0, 0.0
+    r_nl_zero, r_n_zero = calc.calcular_rn(30.0, 20.0, 2.0, 20.0, 0.0, 15.0)
+    assert r_nl_zero == 0.0
+    assert r_n_zero == 0.0
+
+    # Case 3: ea < 0 -> should default ea to 0.0
+    r_nl_neg, r_n_neg = calc.calcular_rn(30.0, 20.0, -1.0, 20.0, 25.0, 15.0)
+    # recalculate expected value internally
+    sigma = 4.903e-9
+    t_max_k = 30.0 + 273.16
+    t_min_k = 20.0 + 273.16
+    termo_temperatura = (sigma * (t_max_k ** 4) + sigma * (t_min_k ** 4)) / 2.0
+    termo_umidade = 0.34 - 0.14 * 0.0 # math.sqrt(0.0)
+    termo_nebulosidade = 1.35 * (20.0 / 25.0) - 0.35
+    exp_rnl = termo_temperatura * termo_umidade * termo_nebulosidade
+    exp_rn = 15.0 - exp_rnl
+    assert round(r_nl_neg, 4) == round(exp_rnl, 4)
+    assert round(r_n_neg, 4) == round(exp_rn, 4)
+def test_calcular_rns():
+    calc = CalculadorIrrigacao()
+    rso, rns = calc.calcular_rns(rs=20.0, ra=35.0, altitude_m=1000.0)
+
+    # Rso = [0.75 + 2 * (1000 / 100000)] * 35.0
+    # Rso = [0.75 + 0.02] * 35.0 = 0.77 * 35.0 = 26.95
+    assert rso == 26.95
+
+    # Rns = 0.77 * 20.0 = 15.40
+    assert rns == 15.40
+def test_calcular_constante_psicrometrica():
+    calc = CalculadorIrrigacao()
+
+    # Test with altitude_z = 0
+    # P = 101.3 * (((293 - 0) / 293) ** 5.26) = 101.3
+    # gamma = 0.665 * 10^-3 * 101.3 = 0.0673645
+    p_kpa, gamma = calc.calcular_constante_psicrometrica(0)
+    assert p_kpa == 101.30
+    assert gamma == 0.067364
+
+    # Test with altitude_z = 1000
+    # P = 101.3 * (((293 - 6.5) / 293) ** 5.26) ~= 90.02
+    # gamma = 0.665 * 10^-3 * P ~= 0.059866
+    p_kpa_1000, gamma_1000 = calc.calcular_constante_psicrometrica(1000)
+    assert p_kpa_1000 == 90.02
+    assert gamma_1000 == 0.059866
 def test_perda_conector_zitterell():
     calc = CalculadorIrrigacao()
 
