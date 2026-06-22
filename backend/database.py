@@ -12,8 +12,9 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS historico_leitura (
+                CREATE TABLE IF NOT EXISTS historico_leitura (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo_projeto TEXT,
             umidade REAL,
             temperatura_max REAL,
             temperatura_min REAL,
@@ -27,6 +28,14 @@ def init_db():
             data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    cursor.execute("PRAGMA table_info(historico_leitura)")
+    columns = [info[1] for info in cursor.fetchall()]
+    if 'codigo_projeto' not in columns:
+        cursor.execute('ALTER TABLE historico_leitura ADD COLUMN codigo_projeto TEXT')
+    cursor.execute("PRAGMA table_info(historico_leitura)")
+    columns = [info[1] for info in cursor.fetchall()]
+    if 'codigo_projeto' not in columns:
+        cursor.execute('ALTER TABLE historico_leitura ADD COLUMN codigo_projeto TEXT')
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS culturas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,8 +47,6 @@ def init_db():
             dias_fase_inicial INTEGER,
             dias_meia_estacao INTEGER,
             dias_fase_final INTEGER,
-            min_ce REAL,
-            max_ce REAL
             min_ce REAL DEFAULT 1.0,
             max_ce REAL DEFAULT 3.0
         )
@@ -92,7 +99,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, profundidade):
 def insert_projeto(codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -119,16 +125,6 @@ def get_projeto_metadados(codigo_projeto):
         return dict(row)
     return None
 
-            INSERT INTO projetos_metadados (codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao))
-        row_id = cursor.lastrowid
-        conn.commit()
-        return {"status": "sucesso", "id": row_id}
-    except sqlite3.IntegrityError:
-        return {"status": "erro", "mensagem": "Já existe um projeto com este código. O código do projeto deve ser único."}
-    finally:
-        conn.close()
 
 def seed_culturas():
     conn = get_db_connection()
@@ -143,7 +139,7 @@ def seed_culturas():
             ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.7, 10.0),
             ('Tomate', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 2.5, 12.5),
             ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.3, 4.0),
-            ('Cebola', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.2, 7.2)
+            ('Cebola', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.2, 7.2),
             ('Tomate tutorado', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 1.0, 3.0),
             ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.0, 3.0),
             ('Batata', 0.50, 1.15, 0.75, '2023-08-20', 25, 30, 30, 1.0, 3.0),
@@ -193,7 +189,6 @@ def delete_banco(banco_id):
     cursor.execute('DELETE FROM bancos WHERE id = ?', (banco_id,))
     conn.commit()
     conn.close()
-def insert_leitura(umidade, temperatura_max, temperatura_min, eto_calculada=0.0, cad_calculada=0.0, irn_calculada=0.0, comprimento_lateral_m=0.0, perda_carga_total_mca=0.0):
 def insert_projeto(dados):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -267,3 +262,51 @@ def get_historico():
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+def obter_projeto_por_codigo(codigo_projeto):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM projetos_metadados WHERE codigo_projeto = ?', (codigo_projeto,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return None
+
+def obter_resumo_hidraulico(codigo_projeto):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT * FROM historico_leitura
+        WHERE codigo_projeto = ?
+        ORDER BY id DESC LIMIT 1
+    ''', (codigo_projeto,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return None
+
+def obter_projeto_por_codigo(codigo_projeto):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM projetos_metadados WHERE codigo_projeto = ?', (codigo_projeto,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return None
+
+def obter_resumo_hidraulico(codigo_projeto):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT * FROM historico_leitura
+        WHERE codigo_projeto = ?
+        ORDER BY id DESC LIMIT 1
+    ''', (codigo_projeto,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return None
