@@ -2,6 +2,17 @@ import math
 import datetime
 
 class CalculadorIrrigacao:
+
+    def definir_kc_por_estagio(self, kc_inicial, kc_media, kc_final, estagio):
+        if estagio == 'inicial':
+            return kc_inicial
+        elif estagio == 'meia_estacao':
+            return kc_media
+        elif estagio == 'final':
+            return kc_final
+        else:
+            return kc_media
+
     def __init__(self):
         # Parâmetros agronómicos padrão (Ex: Tomate / Cana-de-açúcar)
         self.umidade_critica = 40.0
@@ -157,9 +168,8 @@ class CalculadorIrrigacao:
         """
         return round(es - ea, 4)
 
-    def calcular_eto_blaney_criddle(self, t_media, mes_index):
+    def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
         """
-        Calcula a Evapotranspiração de Referência (ETo em mm/dia) usando o método de Blaney-Criddle-FAO.
         Baseado na Tabela 3 - Percentagem diária de horas anuais de luz solar (P) para Latitude Sul.
         """
         # Tabela 3 - Percentagem diária de horas anuais de luz solar (Latitudes Sul)
