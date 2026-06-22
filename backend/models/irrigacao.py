@@ -438,6 +438,23 @@ class CalculadorIrrigacao:
             return 'Perfil Tipo IIc (Declive Forte)'
         else:
             return 'Perfil Tipo IId (Declive Muito Forte)'
+    def calcular_lmax_perfil_tipo_I(self, H, Hvar, So, k_linha):
+        """
+        Calcula o comprimento máximo da linha lateral em Perfil Tipo I (Aclive)
+        de forma iterativa utilizando a Equação 58 da tese.
+        L = (H * Hvar) / (k_linha * L^1.75 + So)
+        """
+        L_anterior = 10.0
+        while True:
+            # Equação 58
+            L_novo = (H * Hvar) / (k_linha * (L_anterior ** 1.75) + So)
+
+            # Condição de parada (diferença menor que 0.01 metros)
+            if abs(L_novo - L_anterior) < 0.01:
+                return round(L_novo, 2)
+
+            L_anterior = L_novo
+
     def perda_conector_lateral(self, diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms):
         """
         Calcula a Perda Localizada de Carga por conexão de entrada em MCA.
