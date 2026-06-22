@@ -141,6 +141,8 @@ class CalculadorIrrigacao:
         return self.tabela_ra[lat_par][mes_index - 1]
 
     def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
+        pass # stub
+
     def calcular_pressao_atual_ea(self, es, umidade_relativa_media_ur):
         """
         Calcula a Pressão Atual de Vapor (ea) em kPa.
@@ -684,12 +686,12 @@ class CalculadorIrrigacao:
             iteracoes += 1
 
         raise ValueError("A iteração para calcular L não convergiu após 1000 passos.")
-            iteracoes += 1
 
-            # Condição da Equação 59
-            condicao = So / (k_linha * (L ** 1.75))
-            if not (0 < condicao < 1):
-                raise ValueError(f"Condição da Equação 59 não satisfeita (deve estar entre 0 e 1): {condicao}")
+    def _calcular_condicao_59(self, So, k_linha, L):
+        # Condição da Equação 59
+        condicao = So / (k_linha * (L ** 1.75))
+        if not (0 < condicao < 1):
+            raise ValueError(f"Condição da Equação 59 não satisfeita (deve estar entre 0 e 1): {condicao}")
 
             # Equação 61
             razao_lL = 1 - 0.56098 * (condicao ** 0.57143)

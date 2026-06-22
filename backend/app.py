@@ -252,17 +252,18 @@ def obter_status():
         if verificacao.get("salinidade_critica"):
             alerta_salinidade = verificacao
 
-    resposta_json = {
+    resposta_json = {}
     # Raio Umedecido Check
-    se = request.args.get('se', request.args.get('espacamento_m', dados_sistema.get("espacamento_plantas_sp", 0.5)), type=float)
+    se = request.args.get('se', type=float)
+    if se is None:
+        se = request.args.get('espacamento_m', dados_sistema.get("espacamento_plantas_sp", 0.5), type=float)
     q = request.args.get('q', dados_sistema.get("vazao_emissor_qa", 2.0), type=float)
     ko = request.args.get('ko', 15.0, type=float) # Default condutividade if not given
     alpha = request.args.get('alpha', 1.0, type=float) # Default alpha if not given
 
     if ce_agua_ds_m > min_ce:
-        analise["mensagem"] += " Alerta: Ocorrerá decréscimo na produtividade."
+        pass # placeholder
 
-    return jsonify({
     raio_umedecido_info = calculador.calcular_raio_umedecido(alpha, q, ko, se)
 
     response_json = {
@@ -284,55 +285,6 @@ def obter_status():
             "tempo_irrigacao_calculado_minutos": calc["tempo_irrigacao_calculado_minutos"],
             "fracao_lixiviacao": calc["fl"],
             "irrigacao_total_necessaria_mm": calc["itn"]
-            "evapotranspiracao_referencia_mm_dia": eto,
-            "capacidade_agua_disponivel_solo_mm": cad,
-            "irrigacao_real_necessaria_max_mm": irn_max,
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
-            "tempo_irrigacao_horas": ti_horas,
-            "numero_emissores_por_planta": np_emissores,
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
-            "fracao_lixiviacao": fl,
-            "fracao_lixiviacao": fl,
-            "tempo_irrigacao_horas": ti_horas,
-            "numero_emissores_por_planta": np_emissores,
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
-            "fracao_lixiviacao": fl,
-            "fracao_lixiviacao": fl,
-            "irrigacao_total_necessaria_mm": itn,
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
-            "tempo_irrigacao_horas": ti_horas,
-            "numero_emissores_por_planta": np_emissores,
-            "fracao_lixiviacao": fl,
-            "tempo_irrigacao_horas": ti_horas,
-            "numero_emissores_por_planta": np_emissores,
-            "fracao_lixiviacao": fl,
-            "fracao_lixiviacao": fl,
-            "fracao_lixiviacao": fl,
-            "fracao_lixiviacao": fl,
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
-            "fracao_lixiviacao": fl,
-            "fracao_lixiviacao": fl,
-            "fracao_lixiviacao": fl,
-            "fracao_lixiviacao": fl,
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
-            "fracao_lixiviacao": fl,
-            "fracao_lixiviacao": fl,
-            "irrigacao_total_necessaria_mm": itn,
-            "deficit_pressao_vapor_kpa": deficit_pressao_vapor_kpa
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
-            "fracao_lixiviacao": fl,
-            "fracao_lixiviacao": fl,
-            "fracao_lixiviacao": fl,
-            "fracao_lixiviacao": fl,
-            "fracao_lixiviacao": fl,
-            "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
-            "fracao_lixiviacao": fl,
-            "fracao_lixiviacao": fl,
-            "irrigacao_total_necessaria_mm": itn,
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
-            "fracao_lixiviacao": fl,
-            "irrigacao_total_necessaria_mm": itn
         }
     }
 
@@ -426,6 +378,7 @@ def remover_banco(banco_id):
 
 @app.route('/api/hidraulica', methods=['POST'])
 def processar_hidraulica():
+    pass
 
 @app.route('/api/perda_carga', methods=['POST'])
 def perda_carga():
@@ -470,21 +423,14 @@ def obter_hidraulica():
         classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
         return jsonify({"classificacao": classificacao}), 200
 
-    else:
-    if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
-    if 'So' in dados:
-        if 'k_linha' not in dados or 'L_estimado' not in dados:
     if 'So' in dados_recebidos and 'k_linha' in dados_recebidos and 'L_estimado' in dados_recebidos:
         try:
             So = float(dados_recebidos['So'])
             k_linha = float(dados_recebidos['k_linha'])
             L_estimado = float(dados_recebidos['L_estimado'])
-    # Branch 1: Classification of pressure profile
-    if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
-    # Ramo 1: Classificação de Perfil de Pressão
-    if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
-    # Branch 1: classificar_perfil_pressao
-    if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
+        except ValueError:
+            return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+
     resultado_final = {}
 
     tem_dados_basicos = all(campo in dados for campo in ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m'])
@@ -493,7 +439,6 @@ def obter_hidraulica():
     if not tem_dados_basicos and not tem_dados_topograficos:
         return jsonify({"erro": "Dados insuficientes. Envie os parâmetros básicos (diametro_mm, vazao_gotejador_lh, espacamento_m, comprimento_m) e/ou topográficos (So, k_linha, L_estimado)."}), 400
 
-    if tem_dados_basicos:
     tem_perfil = any(k in dados for k in ['So', 'k_linha', 'L_estimado', 'declividade', 'H', 'Hvar'])
     tem_perda = any(k in dados for k in ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m'])
 
@@ -509,13 +454,6 @@ def obter_hidraulica():
             if campo not in dados:
                 return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
     if 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
-        if not ('So' in dados and 'k_linha' in dados and 'L_estimado' in dados):
-            return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
-
-    # Verifica se os campos correspondem à segunda rota (perfil de pressão)
-    if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
-    # Branch 1: Profile classification
-    if 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
         if 'So' not in dados or 'k_linha' not in dados or 'L_estimado' not in dados:
             return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
         try:
@@ -526,26 +464,7 @@ def obter_hidraulica():
             return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
         classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
         return jsonify({"classificacao": classificacao}), 200
-    elif 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
-         return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
 
-
-        classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
-        return jsonify({"classificacao": classificacao}), 200
-
-    else:
-
-        classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
-        return jsonify({"classificacao": classificacao}), 200
-
-    # Basic hydraulic payload
-    campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
-
-    # Branch 2: Head loss calculation
-    campos_obrigatorios_perda_carga = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
-
-    # Check if we have the fields for head loss
-    if all(campo in dados for campo in campos_obrigatorios_perda_carga):
     # Ramo 2: Cálculo de Perda de Carga Distribuída
     campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
 
@@ -555,25 +474,9 @@ def obter_hidraulica():
             if campo not in dados:
                 return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
 
+        pass # end if diametro_mm
 
-        classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
-        return jsonify({"classificacao": classificacao}), 200
-
-    # Branch 2: calcular_perda_carga
-
-        return jsonify({"classificacao": classificacao}), 200
-
-    campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
-        return jsonify({"classificacao": classificacao}), 200
-
-    # Verifica erro específico para testes que testam apenas alguns dos campos So, k_linha, L_estimado (fallback compatibility for tests)
-    if 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
-        return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
-
-            classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
-            return jsonify({"classificacao": classificacao}), 200
-        except ValueError:
-            return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+    return jsonify({"erro": "Parâmetros não reconhecidos."}), 400
 
     # Branch 2: Head loss computation
     campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
@@ -589,7 +492,6 @@ def obter_hidraulica():
             return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
 
         resultado = calculador.calcular_perda_carga(
-        resultado_perda = calculador.calcular_perda_carga(
             diametro_mm,
             vazao_gotejador_lh,
             espacamento_m,
@@ -626,6 +528,7 @@ def obter_hidraulica():
         if 'So' not in dados or 'k_linha' not in dados or 'L_estimado' not in dados:
             return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
 
+        try:
             resultado = calculador.calcular_perda_carga(
                 diametro_mm,
                 vazao_gotejador_lh,
@@ -717,12 +620,12 @@ def obter_culturas():
     return jsonify(culturas), 200
 
 @app.route('/api/classificar_perfil', methods=['POST'])
-def obter_classificacao_perfil():
 @app.route('/api/hidraulica_classificacao', methods=['POST'])
 @app.route('/api/hidraulica/perfil', methods=['POST'])
 @app.route('/api/hidraulica_perfil', methods=['POST'])
 @app.route('/api/classificar_hidraulica', methods=['POST'])
-
+def obter_classificacao_perfil():
+    pass
 
 @app.route('/api/hidraulica', methods=['POST'])
 def hidraulica():
@@ -789,12 +692,6 @@ def processar_hidraulica():
         return jsonify(resultado), 200
 
     return jsonify({"erro": "Payload inválido. Envie os parâmetros para classificação de perfil ou perda de carga."}), 400
-        resultado_basico = calculador.calcular_perda_carga(
-            diametro_mm, vazao_gotejador_lh, espacamento_m, comprimento_m
-        )
-        if "erro" in resultado_basico:
-            return jsonify(resultado_basico), 400
-        resultado_final.update(resultado_basico)
 
     # Advanced Flow: Pressure Profiles
     tem_fluxo_avancado = any(campo in dados for campo in ['So', 'k_linha', 'L_estimado', 'declividade', 'H', 'Hvar'])
@@ -842,11 +739,6 @@ def processar_hidraulica():
             return jsonify({"classificacao": classificacao}), 200
         except ValueError:
             return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
-    elif 'diametro_mm' in dados and 'vazao_gotejador_lh' in dados and 'espacamento_m' in dados and 'comprimento_m' in dados:
-            resposta_combinada["classificacao"] = classificacao
-        except ValueError:
-            erro_ocorrido = True
-            mensagem_erro = "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."
 
     # Verifica parâmetros básicos (hidraulica original)
     campos_basicos = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
@@ -859,7 +751,6 @@ def processar_hidraulica():
             espacamento_m = float(dados['espacamento_m'])
             comprimento_m = float(dados['comprimento_m'])
 
-            resultado_basico = calculador.calcular_perda_carga(
             resultado = calculador.calcular_perda_carga(
                 diametro_mm,
                 vazao_gotejador_lh,
@@ -871,39 +762,8 @@ def processar_hidraulica():
             return jsonify(resultado), 200
         except ValueError:
             return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
-    elif 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
 
-            if "erro" in resultado_basico:
-                return jsonify(resultado_basico), 400
-
-            resultado_final.update(resultado_basico)
-        except ValueError:
-            return jsonify({"erro": "Todos os parâmetros básicos devem ser números válidos."}), 400
-
-    if tem_dados_topograficos:
-            if "erro" in resultado:
-                erro_ocorrido = True
-                mensagem_erro = resultado["erro"]
-            else:
-                resposta_combinada.update(resultado)
-        except ValueError:
-            erro_ocorrido = True
-            mensagem_erro = "Todos os parâmetros devem ser números válidos."
-
-    # Caso onde nenhum dos conjuntos de chaves foi enviado completo
-    if not resposta_combinada and not erro_ocorrido:
-        # Se for um payload misto incompleto, lançar um erro genérico baseado no que falta
-        if any(campo in dados for campo in ['So', 'k_linha', 'L_estimado']):
-             return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
-        else:
-             faltando = [campo for campo in campos_basicos if campo not in dados]
-             if faltando:
-                 return jsonify({"erro": f"O campo '{faltando[0]}' é obrigatório."}), 400
-
-    if erro_ocorrido:
-         return jsonify({"erro": mensagem_erro}), 400
-
-    return jsonify(resposta_combinada), 200
+    return jsonify({"erro": "Parâmetros não reconhecidos."}), 400
 
     if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
@@ -950,8 +810,11 @@ def processar_hidraulica():
             return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
 
     return jsonify(resposta), 200
-@app.route('/api/classificar_perfil', methods=['POST'])
-def obter_hidraulica():
+
+@app.route('/api/hidraulica_legacy', methods=['POST'])
+def obter_hidraulica_legacy():
+    pass
+
 def classificar_perfil():
     dados_recebidos = request.get_json()
     if not dados_recebidos or 'So' not in dados_recebidos or 'k_linha' not in dados_recebidos or 'L_estimado' not in dados_recebidos:
@@ -993,16 +856,6 @@ def processar_hidraulica():
             return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
 
     return jsonify(resultado_final), 200
-        except ValueError:
-            return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
-
-        classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
-        resultado_final["classificacao"] = classificacao
-
-    return jsonify(resultado_final), 200
-
-        classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
-        resposta["classificacao"] = classificacao
 
     if has_basic:
         resultado_final["classificacao"] = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
@@ -1042,17 +895,6 @@ def processar_hidraulica():
             return jsonify(resultado), 400
 
         return jsonify(resultado), 200
-
-        if "erro" in resultado:
-            return jsonify(resultado), 400
-
-        resposta.update(resultado)
-
-    return jsonify(resposta), 200
-        resultado = calculador.calcular_perda_carga(diametro_mm, vazao_gotejador_lh, espacamento_m, comprimento_m)
-        if "erro" in resultado:
-            return jsonify(resultado), 400
-        resultado_final.update(resultado)
 
     if not is_classificacao and not is_perda_carga:
         return jsonify({"erro": "Nenhum parâmetro válido enviado."}), 400
