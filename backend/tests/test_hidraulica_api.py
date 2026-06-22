@@ -19,7 +19,7 @@ def test_hidraulica_endpoint(client):
         "espacamento_m": 0.5,
         "comprimento_m": 50
     }
-    response = client.post('/api/perda_carga', data=json.dumps(payload), content_type='application/json')
+    response = client.post('/api/hidraulica', data=json.dumps(payload), content_type='application/json')
     assert response.status_code == 200
     data = json.loads(response.data)
     assert data['vazao_total_lh'] == 200.0
@@ -30,7 +30,7 @@ def test_hidraulica_endpoint_missing_fields(client):
     payload = {
         "diametro_mm": 16
     }
-    response = client.post('/api/perda_carga', data=json.dumps(payload), content_type='application/json')
+    response = client.post('/api/hidraulica', data=json.dumps(payload), content_type='application/json')
     assert response.status_code == 400
     data = json.loads(response.data)
     assert "erro" in data
