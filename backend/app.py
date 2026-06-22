@@ -3,7 +3,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from models.irrigacao import CalculadorIrrigacao
 import datetime
-from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas
+from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, insert_projeto
 
 app = Flask(__name__)
 CORS(app)
@@ -25,9 +25,9 @@ dados_sistema = {
     "espacamento_plantas_sp": 0.5,
     "espacamento_fileiras_sr": 1.0,
     "dw_diametro_molhado": 0.3,
-    "vazao_emissor_qa": 2.0
+    "vazao_emissor_qa": 2.0,
     "espacamento_plantas_m": 0.5,   # Espaçamento entre plantas na fileira
-    "espacamento_fileiras_m": 1.0   # Espaçamento entre fileiras
+    "espacamento_fileiras_m": 1.0,  # Espaçamento entre fileiras
     "ce_solo_min": 1.0,             # Condutividade elétrica mínima do solo suportada (dS/m) - padrão
     "ce_solo_max": 3.0,             # Condutividade elétrica máxima tolerada pela cultura (dS/m)
     "uniformidade_emissao_decimal": 0.90 # Uniformidade de emissão do gotejador (90%)
@@ -96,6 +96,7 @@ def obter_status():
         etc_mm_dia=eto,
         sp_m=dados_sistema["espacamento_plantas_m"],
         sr_m=dados_sistema["espacamento_fileiras_m"]
+    )
     # Verifica se foi enviada a condutividade elétrica da água via query params
     ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
 
@@ -155,11 +156,9 @@ def obter_status():
             "irrigacao_real_necessaria_max_mm": irn_max,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
             "tempo_irrigacao_horas": ti_horas,
-            "numero_emissores_por_planta": np_emissores
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos
+            "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
-            "irrigacao_total_necessaria_mm": itn,
-            "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0)
+            "irrigacao_total_necessaria_mm": itn
         }
     }), 200
 
@@ -232,8 +231,8 @@ def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
 
-@app.route('/api/hidraulica', methods=['POST'])
-def obter_hidraulica():
+@app.route('/api/classificar_perfil', methods=['POST'])
+def classificar_perfil():
     dados_recebidos = request.get_json()
     if not dados_recebidos or 'So' not in dados_recebidos or 'k_linha' not in dados_recebidos or 'L_estimado' not in dados_recebidos:
         return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
@@ -248,6 +247,19 @@ def obter_hidraulica():
     classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
 
     return jsonify({"classificacao": classificacao}), 200
+
+@app.route('/api/projetos', methods=['POST'])
+def criar_projeto():
+    dados = request.get_json()
+    if not dados or 'codigo_projeto' not in dados:
+        return jsonify({"erro": "O campo 'codigo_projeto' é obrigatório."}), 400
+
+    sucesso = insert_projeto(dados)
+
+    if not sucesso:
+        return jsonify({"erro": "Este Código já existe"}), 400
+
+    return jsonify({"status": "sucesso", "mensagem": "Projeto criado com sucesso"}), 201
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
