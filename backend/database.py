@@ -19,6 +19,11 @@ def init_db():
             temperatura_min REAL,
             status_solo TEXT,
             tempo_irrigacao_calculado REAL,
+            eto_calculada REAL,
+            cad_calculada REAL,
+            irn_calculada REAL,
+            comprimento_lateral_m REAL,
+            perda_carga_total_mca REAL,
             data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -32,7 +37,39 @@ def init_db():
             data_plantio TEXT,
             dias_fase_inicial INTEGER,
             dias_meia_estacao INTEGER,
-            dias_fase_final INTEGER
+            dias_fase_final INTEGER,
+            min_ce REAL,
+            max_ce REAL
+            min_ce REAL DEFAULT 1.0,
+            max_ce REAL DEFAULT 3.0
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS projetos_metadados (
+            codigo_projeto TEXT PRIMARY KEY UNIQUE,
+            nome_projeto TEXT,
+            nome_propriedade TEXT,
+            nome_proprietario TEXT,
+            nome_projetista TEXT,
+            codigo_subunidade TEXT,
+            area_total_irrigada REAL,
+            area_subunidade REAL,
+            data_elaboracao TEXT
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS projetos_metadados (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo_projeto TEXT UNIQUE NOT NULL,
+            nome_projeto TEXT,
+            nome_propriedade TEXT,
+            nome_proprietario TEXT,
+            nome_projetista TEXT,
+            identificacao TEXT,
+            nome_codigo_subunidade TEXT,
+            area_total_irrigada REAL,
+            area_subunidade REAL,
+            data_elaboracao TEXT
         )
     ''')
     cursor.execute('''
@@ -45,6 +82,22 @@ def init_db():
     conn.commit()
     conn.close()
 
+def insert_projeto(codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO projetos_metadados (codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao))
+        row_id = cursor.lastrowid
+        conn.commit()
+        return {"status": "sucesso", "id": row_id}
+    except sqlite3.IntegrityError:
+        return {"status": "erro", "mensagem": "Já existe um projeto com este código. O código do projeto deve ser único."}
+    finally:
+        conn.close()
+
 def seed_culturas():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -54,16 +107,21 @@ def seed_culturas():
 
     if count == 0:
         culturas = [
-            ('Tomate tutorado', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30),
-            ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15),
-            ('Batata', 0.50, 1.15, 0.75, '2023-08-20', 25, 30, 30),
-            ('Cebola seca', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20),
-            ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30),
-            ('Melancia', 0.40, 1.00, 0.75, '2023-09-05', 20, 30, 20)
+            ('Algodoeiro', 0.35, 1.20, 0.60, '2023-10-01', 30, 50, 40, 7.7, 27.0),
+            ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.7, 10.0),
+            ('Tomate', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 2.5, 12.5),
+            ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.3, 4.0),
+            ('Cebola', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.2, 7.2)
+            ('Tomate tutorado', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 1.0, 3.0),
+            ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.0, 3.0),
+            ('Batata', 0.50, 1.15, 0.75, '2023-08-20', 25, 30, 30, 1.0, 3.0),
+            ('Cebola seca', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.0, 3.0),
+            ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.0, 3.0),
+            ('Melancia', 0.40, 1.00, 0.75, '2023-09-05', 20, 30, 20, 1.0, 3.0)
         ]
         cursor.executemany('''
-            INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', culturas)
         conn.commit()
 
@@ -72,7 +130,7 @@ def seed_culturas():
 def get_culturas():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT id, nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final FROM culturas ORDER BY nome')
+    cursor.execute('SELECT id, nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce FROM culturas ORDER BY nome')
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
@@ -103,14 +161,41 @@ def delete_banco(banco_id):
     cursor.execute('DELETE FROM bancos WHERE id = ?', (banco_id,))
     conn.commit()
     conn.close()
+def insert_leitura(umidade, temperatura_max, temperatura_min, eto_calculada=0.0, cad_calculada=0.0, irn_calculada=0.0, comprimento_lateral_m=0.0, perda_carga_total_mca=0.0):
+def insert_projeto(dados):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO projetos_metadados (
+                codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario,
+                nome_projetista, codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            dados.get('codigo_projeto'),
+            dados.get('nome_projeto'),
+            dados.get('nome_propriedade'),
+            dados.get('nome_proprietario'),
+            dados.get('nome_projetista'),
+            dados.get('codigo_subunidade'),
+            dados.get('area_total_irrigada'),
+            dados.get('area_subunidade'),
+            dados.get('data_elaboracao')
+        ))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
 
 def insert_leitura(umidade, temperatura_max, temperatura_min):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO historico_leitura (umidade, temperatura_max, temperatura_min)
-        VALUES (?, ?, ?)
-    ''', (umidade, temperatura_max, temperatura_min))
+        INSERT INTO historico_leitura (umidade, temperatura_max, temperatura_min, eto_calculada, cad_calculada, irn_calculada, comprimento_lateral_m, perda_carga_total_mca)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (umidade, temperatura_max, temperatura_min, eto_calculada, cad_calculada, irn_calculada, comprimento_lateral_m, perda_carga_total_mca))
     row_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -129,14 +214,14 @@ def get_ultima_leitura():
         return dict(row)
     return None
 
-def update_leitura_status(leitura_id, status_solo, tempo_irrigacao_calculado):
+def update_leitura_status(leitura_id, status_solo, tempo_irrigacao_calculado, eto_calculada=0.0, cad_calculada=0.0, irn_calculada=0.0, comprimento_lateral_m=0.0, perda_carga_total_mca=0.0):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE historico_leitura
-        SET status_solo = ?, tempo_irrigacao_calculado = ?
+        SET status_solo = ?, tempo_irrigacao_calculado = ?, eto_calculada = ?, cad_calculada = ?, irn_calculada = ?, comprimento_lateral_m = ?, perda_carga_total_mca = ?
         WHERE id = ?
-    ''', (status_solo, tempo_irrigacao_calculado, leitura_id))
+    ''', (status_solo, tempo_irrigacao_calculado, eto_calculada, cad_calculada, irn_calculada, comprimento_lateral_m, perda_carga_total_mca, leitura_id))
     conn.commit()
     conn.close()
 
