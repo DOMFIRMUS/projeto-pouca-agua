@@ -157,6 +157,7 @@ def obter_status():
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn
         }

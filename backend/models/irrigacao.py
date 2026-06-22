@@ -234,6 +234,22 @@ class CalculadorIrrigacao:
 
         tr_max = math.floor(irn_max_mm / (etc_mm_dia * sp_m * sr_m))
         return tr_max
+    def resolver_fator_atrito_f(self, velocidade, diametro_m):
+        """
+        Calcula o fator de atrito (f) baseado na velocidade e no diâmetro.
+        Utiliza o número de Reynolds (R) e equações para diferentes regimes de escoamento.
+        """
+        r = (velocidade * diametro_m) / 1.01e-6
+
+        if r < 2000:
+            f = 64 / r if r > 0 else 0
+        elif 2000 <= r < 3000:
+            f = 0.04
+        else:
+            f = 0.316 / (r ** 0.25)
+
+        return f
+
     def comprimento_trecho_a_trecho(self, diametro_m, vazao_emissor_m3s, espacamento_m, pressao_entrada_mca, declividade, hvar_max):
         """
         Calcula o comprimento máximo da linha lateral trecho a trecho (do último emissor para o primeiro).
@@ -248,14 +264,7 @@ class CalculadorIrrigacao:
         while True:
             vazao_acumulada_m3s = i * vazao_emissor_m3s
             v = vazao_acumulada_m3s / area
-            r = (v * diametro_m) / 1.01e-6
-
-            if r < 2000:
-                f = 64 / r if r > 0 else 0
-            elif 2000 <= r < 3000:
-                f = 0.04
-            else:
-                f = 0.316 / (r ** 0.25)
+            f = self.resolver_fator_atrito_f(v, diametro_m)
 
             hf = 8.263e-2 * f * (vazao_acumulada_m3s ** 2 / diametro_m ** 5) * espacamento_m
 
