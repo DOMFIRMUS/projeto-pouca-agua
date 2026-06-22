@@ -93,7 +93,7 @@ def test_historico_get(client):
     assert data[0]['umidade'] == 45.0
     assert data[1]['umidade'] == 40.0
 
-def test_hidraulica_post_success(client):
+def test_hidraulica_post_success_advanced(client):
     response = client.post('/api/hidraulica', json={
         'So': 0.5,
         'k_linha': 1.0,
@@ -103,6 +103,32 @@ def test_hidraulica_post_success(client):
     data = json.loads(response.data)
     assert 'classificacao' in data
     assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
+
+def test_hidraulica_post_success_basic(client):
+    response = client.post('/api/hidraulica', json={
+        'diametro_mm': 16.0,
+        'vazao_gotejador_lh': 2.0,
+        'espacamento_m': 0.5,
+        'comprimento_m': 100.0
+    })
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'perda_carga_mca' in data
+
+def test_hidraulica_post_success_combined(client):
+    response = client.post('/api/hidraulica', json={
+        'So': 0.5,
+        'k_linha': 1.0,
+        'L_estimado': 1.0,
+        'diametro_mm': 16.0,
+        'vazao_gotejador_lh': 2.0,
+        'espacamento_m': 0.5,
+        'comprimento_m': 100.0
+    })
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'classificacao' in data
+    assert 'perda_carga_mca' in data
 
 def test_hidraulica_post_missing_fields(client):
     response = client.post('/api/hidraulica', json={

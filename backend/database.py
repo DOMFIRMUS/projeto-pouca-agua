@@ -19,6 +19,11 @@ def init_db():
             temperatura_min REAL,
             status_solo TEXT,
             tempo_irrigacao_calculado REAL,
+            eto_calculada REAL,
+            cad_calculada REAL,
+            irn_calculada REAL,
+            comprimento_lateral_m REAL,
+            perda_carga_total_mca REAL,
             data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -70,13 +75,13 @@ def get_culturas():
     conn.close()
     return [dict(row) for row in rows]
 
-def insert_leitura(umidade, temperatura_max, temperatura_min):
+def insert_leitura(umidade, temperatura_max, temperatura_min, eto_calculada=0.0, cad_calculada=0.0, irn_calculada=0.0, comprimento_lateral_m=0.0, perda_carga_total_mca=0.0):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO historico_leitura (umidade, temperatura_max, temperatura_min)
-        VALUES (?, ?, ?)
-    ''', (umidade, temperatura_max, temperatura_min))
+        INSERT INTO historico_leitura (umidade, temperatura_max, temperatura_min, eto_calculada, cad_calculada, irn_calculada, comprimento_lateral_m, perda_carga_total_mca)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (umidade, temperatura_max, temperatura_min, eto_calculada, cad_calculada, irn_calculada, comprimento_lateral_m, perda_carga_total_mca))
     row_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -95,14 +100,14 @@ def get_ultima_leitura():
         return dict(row)
     return None
 
-def update_leitura_status(leitura_id, status_solo, tempo_irrigacao_calculado):
+def update_leitura_status(leitura_id, status_solo, tempo_irrigacao_calculado, eto_calculada=0.0, cad_calculada=0.0, irn_calculada=0.0, comprimento_lateral_m=0.0, perda_carga_total_mca=0.0):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE historico_leitura
-        SET status_solo = ?, tempo_irrigacao_calculado = ?
+        SET status_solo = ?, tempo_irrigacao_calculado = ?, eto_calculada = ?, cad_calculada = ?, irn_calculada = ?, comprimento_lateral_m = ?, perda_carga_total_mca = ?
         WHERE id = ?
-    ''', (status_solo, tempo_irrigacao_calculado, leitura_id))
+    ''', (status_solo, tempo_irrigacao_calculado, eto_calculada, cad_calculada, irn_calculada, comprimento_lateral_m, perda_carga_total_mca, leitura_id))
     conn.commit()
     conn.close()
 
