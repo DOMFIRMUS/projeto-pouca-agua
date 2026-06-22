@@ -25,9 +25,9 @@ dados_sistema = {
     "espacamento_plantas_sp": 0.5,
     "espacamento_fileiras_sr": 1.0,
     "dw_diametro_molhado": 0.3,
-    "vazao_emissor_qa": 2.0
+    "vazao_emissor_qa": 2.0,
     "espacamento_plantas_m": 0.5,   # Espaçamento entre plantas na fileira
-    "espacamento_fileiras_m": 1.0   # Espaçamento entre fileiras
+    "espacamento_fileiras_m": 1.0,   # Espaçamento entre fileiras
     "ce_solo_min": 1.0,             # Condutividade elétrica mínima do solo suportada (dS/m) - padrão
     "ce_solo_max": 3.0,             # Condutividade elétrica máxima tolerada pela cultura (dS/m)
     "uniformidade_emissao_decimal": 0.90 # Uniformidade de emissão do gotejador (90%)
@@ -96,6 +96,7 @@ def obter_status():
         etc_mm_dia=eto,
         sp_m=dados_sistema["espacamento_plantas_m"],
         sr_m=dados_sistema["espacamento_fileiras_m"]
+    )
     # Verifica se foi enviada a condutividade elétrica da água via query params
     ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
 
@@ -155,11 +156,9 @@ def obter_status():
             "irrigacao_real_necessaria_max_mm": irn_max,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
             "tempo_irrigacao_horas": ti_horas,
-            "numero_emissores_por_planta": np_emissores
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos
+            "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
-            "irrigacao_total_necessaria_mm": itn,
-            "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0)
+            "irrigacao_total_necessaria_mm": itn
         }
     }), 200
 
@@ -232,8 +231,8 @@ def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
 
-@app.route('/api/hidraulica', methods=['POST'])
-def obter_hidraulica():
+@app.route('/api/classificar_perfil', methods=['POST'])
+def obter_classificacao_perfil():
     dados_recebidos = request.get_json()
     if not dados_recebidos or 'So' not in dados_recebidos or 'k_linha' not in dados_recebidos or 'L_estimado' not in dados_recebidos:
         return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
