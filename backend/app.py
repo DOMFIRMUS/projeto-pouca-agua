@@ -273,6 +273,10 @@ def obter_status():
             "evapotranspiracao_referencia_mm_dia": eto,
             "capacidade_agua_disponivel_solo_mm": cad,
             "irrigacao_real_necessaria_max_mm": irn_max,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "tempo_irrigacao_horas": ti_horas,
+            "numero_emissores_por_planta": np_emissores,
+            "fracao_lixiviacao": fl,
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
@@ -417,6 +421,22 @@ def obter_hidraulica():
     if not dados_recebidos:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
+    # Determina o fluxo de cálculo com base nos campos recebidos
+    if 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
+        if not ('So' in dados and 'k_linha' in dados and 'L_estimado' in dados):
+            return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+
+        try:
+            So = float(dados['So'])
+            k_linha = float(dados['k_linha'])
+            L_estimado = float(dados['L_estimado'])
+        except ValueError:
+            return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+
+        classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+        return jsonify({"classificacao": classificacao}), 200
+
+    else:
     if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
     if 'So' in dados:
         if 'k_linha' not in dados or 'L_estimado' not in dados:
@@ -973,6 +993,11 @@ def processar_hidraulica():
             espacamento_m,
             comprimento_m
         )
+
+        if "erro" in resultado:
+            return jsonify(resultado), 400
+
+        return jsonify(resultado), 200
 
         if "erro" in resultado:
             return jsonify(resultado), 400
