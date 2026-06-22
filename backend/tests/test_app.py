@@ -93,6 +93,7 @@ def test_historico_get(client):
     assert data[0]['umidade'] == 45.0
     assert data[1]['umidade'] == 40.0
 
+def test_hidraulica_post_perfil_success(client):
 def test_hidraulica_post_success(client):
     payload = {
         "diametro_mm": 16,
@@ -118,6 +119,7 @@ def test_hidraulica_post_success(client):
     assert 'perda_carga_mca' in data
     assert data['status'] == "Aceitável"
 
+def test_hidraulica_post_perfil_missing_fields(client):
 def test_hidraulica_post_missing_fields(client):
     payload = {
         "diametro_mm": 16
@@ -180,6 +182,8 @@ def test_hidraulica_post_missing_fields(client):
     assert 'erro' in data
     assert "Parâmetros insuficientes" in data['erro']
 
+def test_hidraulica_post_perfil_invalid_type(client):
+    response = client.post('/api/hidraulica', json={
 def test_hidraulica_post_invalid_type(client):
     response = client.post('/api/hidraulica/perfil', json={
     response = client.post('/api/hidraulica_perfil', json={
@@ -194,6 +198,7 @@ def test_hidraulica_post_invalid_type(client):
     assert 'erro' in data
     assert "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos." in data['erro']
 
+def test_hidraulica_post_both_success(client):
 def test_status_get_salinidade_alerta(client):
     client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})
     # Passing high CE to trigger warning
@@ -206,6 +211,10 @@ def test_hidraulica_post_mixed_payload(client):
         'So': 0.5,
         'k_linha': 1.0,
         'L_estimado': 1.0,
+        'diametro_mm': 16.0,
+        'vazao_gotejador_lh': 2.0,
+        'espacamento_m': 0.5,
+        'comprimento_m': 50.0
         "diametro_mm": 16,
         "vazao_gotejador_lh": 2,
         "espacamento_m": 0.5,
@@ -214,6 +223,8 @@ def test_hidraulica_post_mixed_payload(client):
     assert response.status_code == 200
     data = json.loads(response.data)
     assert 'classificacao' in data
+    assert 'perda_carga_mca' in data
+    assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
     assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
     assert 'vazao_total_lh' in data
     assert data['vazao_total_lh'] == 200.0

@@ -284,6 +284,7 @@ def obter_status():
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
@@ -347,6 +348,13 @@ def obter_historico():
     historico = get_historico()
     return jsonify(historico), 200
 
+@app.route('/api/culturas', methods=['GET'])
+def obter_culturas():
+    culturas = get_culturas()
+    return jsonify(culturas), 200
+
+@app.route('/api/hidraulica', methods=['POST'])
+def processar_hidraulica():
 
 @app.route('/api/perda_carga', methods=['POST'])
 def perda_carga():
@@ -355,6 +363,20 @@ def perda_carga():
     if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
+    tem_perfil = any(k in dados for k in ['So', 'k_linha', 'L_estimado', 'declividade', 'H', 'Hvar'])
+    tem_perda = any(k in dados for k in ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m'])
+
+    if not tem_perfil and not tem_perda:
+        return jsonify({"erro": "Nenhum dado válido para cálculo hidráulico foi enviado."}), 400
+
+    resultado_final = {}
+
+    # Lógica de Perda de Carga
+    if tem_perda:
+        campos_perda = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
+        for campo in campos_perda:
+            if campo not in dados:
+                return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
     if 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
         if not ('So' in dados and 'k_linha' in dados and 'L_estimado' in dados):
             return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
@@ -398,6 +420,26 @@ def perda_carga():
             vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
             espacamento_m = float(dados['espacamento_m'])
             comprimento_m = float(dados['comprimento_m'])
+        except ValueError:
+            return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
+
+        resultado_perda = calculador.calcular_perda_carga(
+            diametro_mm,
+            vazao_gotejador_lh,
+            espacamento_m,
+            comprimento_m
+        )
+
+        if "erro" in resultado_perda:
+            return jsonify(resultado_perda), 400
+
+        resultado_final.update(resultado_perda)
+
+    # Lógica de Perfil de Pressão
+    if tem_perfil:
+        if 'So' not in dados or 'k_linha' not in dados or 'L_estimado' not in dados:
+            return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+
             resultado = calculador.calcular_perda_carga(
                 diametro_mm,
                 vazao_gotejador_lh,
@@ -623,6 +665,11 @@ def processar_hidraulica():
             L_estimado = float(dados['L_estimado'])
         except ValueError:
             return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+
+        classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+        resultado_final["classificacao"] = classificacao
+
+    return jsonify(resultado_final), 200
 
         classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
         resposta["classificacao"] = classificacao
