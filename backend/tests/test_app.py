@@ -112,7 +112,7 @@ def test_hidraulica_post_missing_fields(client):
     assert response.status_code == 400
     data = json.loads(response.data)
     assert 'erro' in data
-    assert "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios." in data['erro']
+    assert "Dados insuficientes" in data['erro']
 
 def test_hidraulica_post_invalid_type(client):
     response = client.post('/api/hidraulica', json={
@@ -124,3 +124,18 @@ def test_hidraulica_post_invalid_type(client):
     data = json.loads(response.data)
     assert 'erro' in data
     assert "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos." in data['erro']
+
+def test_hidraulica_post_combined(client):
+    response = client.post('/api/hidraulica', json={
+        'diametro_mm': 16,
+        'vazao_gotejador_lh': 2,
+        'espacamento_m': 0.5,
+        'comprimento_m': 50,
+        'So': 0.5,
+        'k_linha': 1.0,
+        'L_estimado': 1.0
+    })
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'classificacao' in data
+    assert 'perda_carga_mca' in data
