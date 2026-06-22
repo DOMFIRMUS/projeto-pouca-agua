@@ -72,6 +72,13 @@ def init_db():
             data_elaboracao TEXT
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS bancos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            taxa_mensal REAL NOT NULL
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -128,6 +135,32 @@ def get_culturas():
     conn.close()
     return [dict(row) for row in rows]
 
+def get_bancos():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, nome, taxa_mensal FROM bancos ORDER BY id')
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def insert_banco(nome, taxa_mensal):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO bancos (nome, taxa_mensal)
+        VALUES (?, ?)
+    ''', (nome, taxa_mensal))
+    row_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return row_id
+
+def delete_banco(banco_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM bancos WHERE id = ?', (banco_id,))
+    conn.commit()
+    conn.close()
 def insert_leitura(umidade, temperatura_max, temperatura_min, eto_calculada=0.0, cad_calculada=0.0, irn_calculada=0.0, comprimento_lateral_m=0.0, perda_carga_total_mca=0.0):
 def insert_projeto(dados):
     conn = get_db_connection()

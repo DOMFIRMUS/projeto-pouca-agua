@@ -1,0 +1,5 @@
+127.0.0.1 - - [22/Jun/2026 01:32:05] "GET /bancos.html HTTP/1.1" 200 -
+127.0.0.1 - - [22/Jun/2026 01:32:49] "GET /bancos.html HTTP/1.1" 200 -
+127.0.0.1 - - [22/Jun/2026 01:32:49] "GET /js/bancos.js HTTP/1.1" 200 -
+127.0.0.1 - - [22/Jun/2026 01:32:49] "GET /css/style.css HTTP/1.1" 200 -
+127.0.0.1 - - [22/Jun/2026 01:32:49] "GET /css/bancos.css HTTP/1.1" 200 -

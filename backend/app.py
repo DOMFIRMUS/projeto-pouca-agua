@@ -3,6 +3,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from models.irrigacao import CalculadorIrrigacao
 import datetime
+from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_bancos, insert_banco, delete_banco
 from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, insert_projeto
 
 app = Flask(__name__)
@@ -274,6 +275,7 @@ def obter_status():
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn,
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
@@ -371,6 +373,33 @@ def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
 
+@app.route('/api/bancos', methods=['GET', 'POST'])
+def gerenciar_bancos():
+    if request.method == 'GET':
+        try:
+            bancos = get_bancos()
+            return jsonify(bancos), 200
+        except Exception as e:
+            return jsonify({"erro": str(e)}), 500
+
+    if request.method == 'POST':
+        try:
+            dados = request.get_json()
+            if not dados or 'nome' not in dados or 'taxa_mensal' not in dados:
+                return jsonify({"erro": "Nome e taxa_mensal são obrigatórios"}), 400
+
+            banco_id = insert_banco(dados['nome'], float(dados['taxa_mensal']))
+            return jsonify({"mensagem": "Banco cadastrado com sucesso", "id": banco_id}), 201
+        except Exception as e:
+            return jsonify({"erro": str(e)}), 500
+
+@app.route('/api/bancos/<int:banco_id>', methods=['DELETE'])
+def remover_banco(banco_id):
+    try:
+        delete_banco(banco_id)
+        return jsonify({"mensagem": "Banco removido com sucesso"}), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
 
 
 @app.route('/api/hidraulica', methods=['POST'])
@@ -380,9 +409,17 @@ def processar_hidraulica():
 def perda_carga():
     dados = request.get_json()
 
-    if not dados:
+@app.route('/api/hidraulica', methods=['POST'])
+def obter_hidraulica():
+    dados_recebidos = request.get_json()
+    if not dados_recebidos:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
+    if 'So' in dados_recebidos and 'k_linha' in dados_recebidos and 'L_estimado' in dados_recebidos:
+        try:
+            So = float(dados_recebidos['So'])
+            k_linha = float(dados_recebidos['k_linha'])
+            L_estimado = float(dados_recebidos['L_estimado'])
     # Branch 1: Classification of pressure profile
     if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
     # Ramo 1: Classificação de Perfil de Pressão
@@ -431,6 +468,9 @@ def perda_carga():
 
         classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
         return jsonify({"classificacao": classificacao}), 200
+
+    # Basic hydraulic payload
+    campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
 
     # Branch 2: Head loss calculation
     campos_obrigatorios_perda_carga = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
@@ -532,10 +572,17 @@ def perda_carga():
     # If it falls through, it's missing fields for both
     # The tests check specifically for diametro_mm being the first required field if nothing else matches
     for campo in campos_obrigatorios:
-        if campo not in dados:
+        if campo not in dados_recebidos:
+            # Revert exactly to what tests expect or unify elegantly
+            if 'So' in dados_recebidos or 'k_linha' in dados_recebidos:
+                 return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
             return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
 
     try:
+        diametro_mm = float(dados_recebidos['diametro_mm'])
+        vazao_gotejador_lh = float(dados_recebidos['vazao_gotejador_lh'])
+        espacamento_m = float(dados_recebidos['espacamento_m'])
+        comprimento_m = float(dados_recebidos['comprimento_m'])
         diametro_mm = float(dados['diametro_mm'])
         vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
         espacamento_m = float(dados['espacamento_m'])
