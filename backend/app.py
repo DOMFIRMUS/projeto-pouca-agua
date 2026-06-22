@@ -280,6 +280,7 @@ def obter_status():
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
@@ -552,6 +553,11 @@ def obter_classificacao_perfil():
 
 
 @app.route('/api/hidraulica', methods=['POST'])
+def hidraulica():
+    dados = request.get_json()
+    if not dados:
+        return jsonify({"erro": "Nenhum dado enviado"}), 400
+
 def processar_hidraulica():
     dados = request.get_json()
 
@@ -661,6 +667,10 @@ def processar_hidraulica():
             k_linha = float(dados['k_linha'])
             L_estimado = float(dados['L_estimado'])
             classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+            return jsonify({"classificacao": classificacao}), 200
+        except ValueError:
+            return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+    elif 'diametro_mm' in dados and 'vazao_gotejador_lh' in dados and 'espacamento_m' in dados and 'comprimento_m' in dados:
             resposta_combinada["classificacao"] = classificacao
         except ValueError:
             erro_ocorrido = True
@@ -684,6 +694,12 @@ def processar_hidraulica():
                 espacamento_m,
                 comprimento_m
             )
+            if "erro" in resultado:
+                return jsonify(resultado), 400
+            return jsonify(resultado), 200
+        except ValueError:
+            return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
+    elif 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
 
             if "erro" in resultado_basico:
                 return jsonify(resultado_basico), 400
@@ -768,7 +784,11 @@ def classificar_perfil():
     dados_recebidos = request.get_json()
     if not dados_recebidos or 'So' not in dados_recebidos or 'k_linha' not in dados_recebidos or 'L_estimado' not in dados_recebidos:
         return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+    else:
+        return jsonify({"erro": "O campo 'diametro_mm' é obrigatório."}), 400
 
+@app.route('/api/projetos', methods=['POST'])
+def salvar_projeto():
     try:
         So = float(dados_recebidos['So'])
         k_linha = float(dados_recebidos['k_linha'])
@@ -859,6 +879,34 @@ def criar_projeto():
     if not dados or 'codigo_projeto' not in dados:
         return jsonify({"erro": "O campo 'codigo_projeto' é obrigatório."}), 400
 
+    codigo_projeto = dados.get('codigo_projeto')
+    nome_projeto = dados.get('nome_projeto')
+    nome_propriedade = dados.get('nome_propriedade')
+    nome_proprietario = dados.get('nome_proprietario')
+    nome_projetista = dados.get('nome_projetista')
+    identificacao = dados.get('identificacao')
+    nome_codigo_subunidade = dados.get('nome_codigo_subunidade')
+    area_total_irrigada = dados.get('area_total_irrigada')
+    area_subunidade = dados.get('area_subunidade')
+    data_elaboracao = dados.get('data_elaboracao')
+
+    resultado = insert_projeto(
+        codigo_projeto,
+        nome_projeto,
+        nome_propriedade,
+        nome_proprietario,
+        nome_projetista,
+        identificacao,
+        nome_codigo_subunidade,
+        area_total_irrigada,
+        area_subunidade,
+        data_elaboracao
+    )
+
+    if resultado["status"] == "erro":
+        return jsonify(resultado), 409
+
+    return jsonify(resultado), 201
     sucesso = insert_projeto(dados)
 
     if not sucesso:
