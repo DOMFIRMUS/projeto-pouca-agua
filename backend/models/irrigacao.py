@@ -628,6 +628,22 @@ class CalculadorIrrigacao:
         hfl_l = 2.268121 * (diametro_conector_m ** 0.106) * (comprimento_conector_m ** 1.057) * (vel_conector_ms ** 1.766) * (vel_lateral_ms ** 0.386)
         return hfl_l
 
+    def calcular_hfl_lateral_vilaca(self, D_C, L_C, v_C, v_L):
+        """
+        Calcula a perda localizada de carga decorrente da mudança de direção do fluxo na inserção da linha lateral.
+        Implementa a Equação 77 da tese.
+        """
+        if not (0.0078 <= D_C <= 0.0167):
+            raise ValueError(f"D_C ({D_C}) fora da faixa permitida (0.0078 - 0.0167 m).")
+        if not (0.0495 <= L_C <= 0.0664):
+            raise ValueError(f"L_C ({L_C}) fora da faixa permitida (0.0495 - 0.0664 m).")
+        if not (0.267 <= v_C <= 14.378):
+            raise ValueError(f"v_C ({v_C}) fora da faixa permitida (0.267 - 14.378 m/s).")
+        if not (0.132 <= v_L <= 3.0):
+            raise ValueError(f"v_L ({v_L}) fora da faixa permitida (0.132 - 3.0 m/s).")
+
+        hfl_l = 2.268121 * (D_C ** 0.106) * (L_C ** 1.057) * (v_C ** 1.766) * (v_L ** 0.386)
+        return hfl_l
     def perda_conector_zitterell(self, die, dis, lc, dt, vt):
         """
         Calcula a perda localizada de carga em conectores de linhas laterais usando o modelo de Zitterell (2011).

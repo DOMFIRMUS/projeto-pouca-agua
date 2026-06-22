@@ -109,6 +109,7 @@ def test_hidraulica_post_success(client):
     assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
 
 def test_hidraulica_post_missing_fields(client):
+    response = client.post('/api/classificar_perfil', json={
     response = client.post('/api/classificar_hidraulica', json={
 def test_hidraulica_post_success_basic(client):
     response = client.post('/api/hidraulica', json={
