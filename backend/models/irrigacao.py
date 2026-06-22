@@ -33,6 +33,21 @@ class CalculadorIrrigacao:
             40: [43.3, 38.3, 30.9, 22.2, 15.8, 12.8, 13.9, 19.1, 27.1, 35.1, 41.8, 44.6],
         }
 
+        # Tabela 4 da tese: Insolação máxima (N) em horas para Latitudes Sul
+        self.tabela_n = {
+            20: [13.1, 12.7, 12.1, 11.5, 11.1, 10.8, 10.9, 11.3, 11.9, 12.5, 13.0, 13.2],
+        }
+
+    def calcular_rs(self, n_horas_sol, N_max, ra_topo):
+        """
+        Calcula a Radiação Solar na superfície (Rs) em MJ/m2/dia.
+        Equação 16 da tese: Rs = (0.25 + 0.50 * (n / N)) * Ra
+        """
+        if N_max <= 0:
+            return 0.0
+
+        rs = (0.25 + 0.50 * (n_horas_sol / N_max)) * ra_topo
+        return round(rs, 2)
     def calcular_pressao_saturacao_es(self, t_max, t_min):
         """
         Calcula a Pressão de Saturação de Vapor (es) média usando o método de Penman-Monteith (FAO56).
