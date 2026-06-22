@@ -85,13 +85,16 @@ def _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agu
         rn = float(request.args.get('rn', 15.0))
         g = float(request.args.get('g', 0.0))
         u2 = float(request.args.get('u2', 2.0))
-        es = float(request.args.get('es', 3.0))
-        ea = float(request.args.get('ea', 1.5))
         delta = float(request.args.get('delta', 0.15))
         gama = float(request.args.get('gama', 0.066))
 
+        # Integração da Sub-rotina Hidráulica de Pressões e Déficit de Pressão de Vapor
+        es_calculado = calculador.calcular_pressao_saturacao_es(temperatura_max, temperatura_min)
+        ea_calculado = calculador.calcular_pressao_atual_ea(es_calculado, umidade_atual)
+        deficit_vapor = calculador.calcular_deficit_vapor(es_calculado, ea_calculado)
+
         eto = calculador.calcular_eto_penman_monteith(
-            rn, g, t_media, u2, es, ea, delta, gama
+            rn, g, t_media, u2, es_calculado, ea_calculado, delta, gama
         )
     else:
         eto = calculador.calcular_eto_hargreaves(
@@ -252,7 +255,6 @@ def obter_status():
         if verificacao.get("salinidade_critica"):
             alerta_salinidade = verificacao
 
-    resposta_json = {
     # Raio Umedecido Check
     se = request.args.get('se', request.args.get('espacamento_m', dados_sistema.get("espacamento_plantas_sp", 0.5)), type=float)
     q = request.args.get('q', dados_sistema.get("vazao_emissor_qa", 2.0), type=float)
@@ -262,9 +264,7 @@ def obter_status():
     if ce_agua_ds_m > min_ce:
         analise["mensagem"] += " Alerta: Ocorrerá decréscimo na produtividade."
 
-    return jsonify({
     raio_umedecido_info = calculador.calcular_raio_umedecido(alpha, q, ko, se)
-
     response_json = {
         "umidade_atual": umidade_atual,
         "status_solo": calc["analise"]["status"],
@@ -283,7 +283,7 @@ def obter_status():
             "numero_emissores_por_planta": calc["np_emissores"],
             "tempo_irrigacao_calculado_minutos": calc["tempo_irrigacao_calculado_minutos"],
             "fracao_lixiviacao": calc["fl"],
-            "irrigacao_total_necessaria_mm": calc["itn"]
+            "irrigacao_total_necessaria_mm": calc["itn"],
             "evapotranspiracao_referencia_mm_dia": eto,
             "capacidade_agua_disponivel_solo_mm": cad,
             "irrigacao_real_necessaria_max_mm": irn_max,
@@ -299,7 +299,7 @@ def obter_status():
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn,
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
@@ -319,7 +319,7 @@ def obter_status():
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn,
-            "deficit_pressao_vapor_kpa": deficit_pressao_vapor_kpa
+            "deficit_pressao_vapor_kpa": deficit_pressao_vapor_kpa,
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
