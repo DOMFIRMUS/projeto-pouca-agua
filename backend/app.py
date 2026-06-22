@@ -270,6 +270,7 @@ def obter_status():
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
@@ -394,7 +395,32 @@ def perda_carga():
         if campo not in dados:
             return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
 
+    try:
+        diametro_mm = float(dados['diametro_mm'])
+        vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
+        espacamento_m = float(dados['espacamento_m'])
+        comprimento_m = float(dados['comprimento_m'])
+        pressao_entrada_mca = float(dados.get('pressao_entrada_mca', 10.0))
+    except ValueError:
+        return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
+
+    resultado = calculador.calcular_perda_carga(
+        diametro_mm,
+        vazao_gotejador_lh,
+        espacamento_m,
+        comprimento_m
+    )
+
+    if "erro" in resultado:
+        return jsonify(resultado), 400
     return jsonify({"erro": "Parâmetros inválidos"}), 400
+
+    validacao = calculador.validar_criterio_pressao_subunidade(
+        resultado['perda_carga_mca'],
+        pressao_entrada_mca
+    )
+
+    resultado.update(validacao)
 
     return jsonify(resultado), 200
 
