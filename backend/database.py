@@ -35,8 +35,44 @@ def init_db():
             dias_fase_final INTEGER
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS projetos_metadados (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo_projeto TEXT UNIQUE NOT NULL,
+            nome_projeto TEXT,
+            largura INTEGER,
+            altura INTEGER,
+            profundidade INTEGER
+        )
+    ''')
     conn.commit()
     conn.close()
+
+def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, profundidade):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO projetos_metadados (codigo_projeto, nome_projeto, largura, altura, profundidade)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (codigo_projeto, nome_projeto, largura, altura, profundidade))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        # Retorna False se houver violação da constraint UNIQUE do codigo_projeto
+        return False
+    finally:
+        conn.close()
+
+def get_projeto_metadados(codigo_projeto):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM projetos_metadados WHERE codigo_projeto = ?', (codigo_projeto,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return None
 
 def seed_culturas():
     conn = get_db_connection()

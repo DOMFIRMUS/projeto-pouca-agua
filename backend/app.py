@@ -3,7 +3,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from models.irrigacao import CalculadorIrrigacao
 import datetime
-from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas
+from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, insert_projeto_metadados, get_projeto_metadados
 
 app = Flask(__name__)
 CORS(app)
@@ -25,9 +25,9 @@ dados_sistema = {
     "espacamento_plantas_sp": 0.5,
     "espacamento_fileiras_sr": 1.0,
     "dw_diametro_molhado": 0.3,
-    "vazao_emissor_qa": 2.0
+    "vazao_emissor_qa": 2.0,
     "espacamento_plantas_m": 0.5,   # Espaçamento entre plantas na fileira
-    "espacamento_fileiras_m": 1.0   # Espaçamento entre fileiras
+    "espacamento_fileiras_m": 1.0,  # Espaçamento entre fileiras
     "ce_solo_min": 1.0,             # Condutividade elétrica mínima do solo suportada (dS/m) - padrão
     "ce_solo_max": 3.0,             # Condutividade elétrica máxima tolerada pela cultura (dS/m)
     "uniformidade_emissao_decimal": 0.90 # Uniformidade de emissão do gotejador (90%)
@@ -96,6 +96,7 @@ def obter_status():
         etc_mm_dia=eto,
         sp_m=dados_sistema["espacamento_plantas_m"],
         sr_m=dados_sistema["espacamento_fileiras_m"]
+    )
     # Verifica se foi enviada a condutividade elétrica da água via query params
     ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
 
@@ -153,10 +154,8 @@ def obter_status():
             "evapotranspiracao_referencia_mm_dia": eto,
             "capacidade_agua_disponivel_solo_mm": cad,
             "irrigacao_real_necessaria_max_mm": irn_max,
-            "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
             "tempo_irrigacao_horas": ti_horas,
-            "numero_emissores_por_planta": np_emissores
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos
+            "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0)
@@ -202,6 +201,18 @@ def hidraulica():
     if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
+    if 'So' in dados and 'k_linha' in dados and 'L_estimado' in dados:
+        try:
+            So = float(dados['So'])
+            k_linha = float(dados['k_linha'])
+            L_estimado = float(dados['L_estimado'])
+        except ValueError:
+            return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+        classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+        return jsonify({"classificacao": classificacao}), 200
+    elif 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
+         return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+
     campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
 
     for campo in campos_obrigatorios:
@@ -227,27 +238,35 @@ def hidraulica():
         return jsonify(resultado), 400
 
     return jsonify(resultado), 200
+
+@app.route('/api/projetos', methods=['POST'])
+def salvar_projeto_metadados():
+    dados = request.get_json()
+    if not dados:
+        return jsonify({"erro": "Nenhum dado enviado"}), 400
+
+    campos_obrigatorios = ['codigo_projeto', 'nome_projeto', 'largura', 'altura', 'profundidade']
+    for campo in campos_obrigatorios:
+        if campo not in dados:
+            return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
+
+    sucesso = insert_projeto_metadados(
+        dados['codigo_projeto'],
+        dados['nome_projeto'],
+        int(dados['largura']),
+        int(dados['altura']),
+        int(dados['profundidade'])
+    )
+
+    if sucesso:
+        return jsonify({"status": "sucesso", "mensagem": "Projeto salvo com sucesso"}), 201
+    else:
+        return jsonify({"erro": "O código do projeto já existe (restrição de unicidade)."}), 409
+
 @app.route('/api/culturas', methods=['GET'])
 def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
-
-@app.route('/api/hidraulica', methods=['POST'])
-def obter_hidraulica():
-    dados_recebidos = request.get_json()
-    if not dados_recebidos or 'So' not in dados_recebidos or 'k_linha' not in dados_recebidos or 'L_estimado' not in dados_recebidos:
-        return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
-
-    try:
-        So = float(dados_recebidos['So'])
-        k_linha = float(dados_recebidos['k_linha'])
-        L_estimado = float(dados_recebidos['L_estimado'])
-    except ValueError:
-        return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
-
-    classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
-
-    return jsonify({"classificacao": classificacao}), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
