@@ -34,6 +34,40 @@ dados_sistema = {
     "uniformidade_emissao_decimal": 0.90 # Uniformidade de emissão do gotejador (90%)
 }
 
+@app.route('/api/status', methods=['GET'])
+def obter_status():
+    ultima_leitura = get_ultima_leitura()
+
+    if not ultima_leitura:
+        return jsonify({"erro": "Nenhuma leitura encontrada no banco de dados."}), 404
+
+    temperatura_max = ultima_leitura['temperatura_max']
+    temperatura_min = ultima_leitura['temperatura_min']
+    umidade_atual = ultima_leitura['umidade']
+    leitura_id = ultima_leitura['id']
+
+    culturas = get_culturas()
+    kc_atual = 1.0 # Default fallback
+    min_ce = dados_sistema["ce_solo_min"]
+    max_ce = dados_sistema["ce_solo_max"]
+
+    if culturas:
+        cultura_ativa = culturas[0]
+        min_ce = cultura_ativa.get('min_ce', dados_sistema["ce_solo_min"])
+        max_ce = cultura_ativa.get('max_ce', dados_sistema["ce_solo_max"])
+        kc_atual = calculador.obter_kc_atual(
+            data_plantio=cultura_ativa['data_plantio'],
+            dias_fases={
+                'inicial': cultura_ativa['dias_fase_inicial'],
+                'meia_estacao': cultura_ativa['dias_meia_estacao'],
+                'final': cultura_ativa['dias_fase_final']
+            },
+            kc_valores={
+                'inicial': cultura_ativa['kc_inicial'],
+                'media': cultura_ativa['kc_media'],
+                'final': cultura_ativa['kc_final']
+            }
+        )
 
 def _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agua_ds_m, metodo_eto='hargreaves'):
     t_media = (temperatura_max + temperatura_min) / 2
@@ -72,8 +106,8 @@ def _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agu
     fl, itn = calculador.calcular_itn(
         irn_max,
         ce_agua_ds_m,
-        dados_sistema["ce_solo_min"],
-        dados_sistema["ce_solo_max"],
+        min_ce,
+        max_ce,
         dados_sistema["uniformidade_emissao_decimal"]
     )
 
@@ -202,6 +236,10 @@ def obter_status():
     ko = request.args.get('ko', 15.0, type=float) # Default condutividade if not given
     alpha = request.args.get('alpha', 1.0, type=float) # Default alpha if not given
 
+    if ce_agua_ds_m > min_ce:
+        analise["mensagem"] += " Alerta: Ocorrerá decréscimo na produtividade."
+
+    return jsonify({
     raio_umedecido_info = calculador.calcular_raio_umedecido(alpha, q, ko, se)
 
     response_json = {
@@ -363,6 +401,7 @@ def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
 
+@app.route('/api/classificar_hidraulica', methods=['POST'])
 
 
 @app.route('/api/hidraulica', methods=['POST'])

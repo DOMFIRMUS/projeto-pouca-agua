@@ -93,6 +93,8 @@ def test_historico_get(client):
     assert data[0]['umidade'] == 45.0
     assert data[1]['umidade'] == 40.0
 
+def test_hidraulica_post_success(client):
+    response = client.post('/api/classificar_hidraulica', json={
 def test_hidraulica_post_success_advanced(client):
     response = client.post('/api/hidraulica', json={
 def test_hidraulica_post_success(client):
@@ -106,6 +108,8 @@ def test_hidraulica_post_success(client):
     assert 'classificacao' in data
     assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
 
+def test_hidraulica_post_missing_fields(client):
+    response = client.post('/api/classificar_hidraulica', json={
 def test_hidraulica_post_success_basic(client):
     response = client.post('/api/hidraulica', json={
         'diametro_mm': 16.0,
@@ -143,6 +147,7 @@ def test_hidraulica_post_missing_fields(client):
     assert "Parâmetros insuficientes" in data['erro']
 
 def test_hidraulica_post_invalid_type(client):
+    response = client.post('/api/classificar_hidraulica', json={
     response = client.post('/api/classificar_perfil', json={
         'So': 'abc',
         'k_linha': 1.0,
@@ -153,6 +158,13 @@ def test_hidraulica_post_invalid_type(client):
     assert 'erro' in data
     assert "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos." in data['erro']
 
+def test_status_get_salinidade_alerta(client):
+    client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})
+    # Passing high CE to trigger warning
+    response = client.get('/api/status?ce_agua_ds_m=10.0')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'Alerta: Ocorrerá decréscimo na produtividade.' in data['mensagem_acao']
 def test_hidraulica_post_mixed_payload(client):
     response = client.post('/api/hidraulica', json={
         'So': 0.5,

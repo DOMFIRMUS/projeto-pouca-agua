@@ -170,13 +170,13 @@ class CalculadorIrrigacao:
         """
         etc = eto * kc * kl
         return round(etc, 2)
-    def calcular_itn(self, irn_mm, ce_agua_ds_m, ce_solo_min, ce_solo_max, uniformidade_emissao_decimal):
+    def calcular_itn(self, irn_mm, ce_agua_ds_m, min_ce, max_ce, uniformidade_emissao_decimal):
         """
         Calcula a Irrigação Total Necessária (ITN) e a Fração de Lixiviação (FL)
-        com base nas Equações 42 e 43 da tese.
+        com base nas Equações 42 e 43 da tese, utilizando min_ce e max_ce específicos da cultura.
         """
         # Equação 43: FL = CEa / (2 * CEes_max)
-        fl = ce_agua_ds_m / (2 * ce_solo_max)
+        fl = ce_agua_ds_m / (2 * max_ce)
 
         # Limitar o FL a valores viáveis para evitar divisão por zero ou negativa na eq. 42
         if fl >= 1.0:
