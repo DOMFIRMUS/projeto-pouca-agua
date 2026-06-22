@@ -274,6 +274,7 @@ def obter_status():
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
@@ -541,6 +542,63 @@ def processar_hidraulica():
 @app.route('/api/hidraulica', methods=['POST'])
 def processar_hidraulica():
     dados = request.get_json()
+
+    if not dados:
+        return jsonify({"erro": "Nenhum dado enviado"}), 400
+
+    resultado_final = {}
+
+    # Basic Flow: Distributed Head Loss
+    tem_fluxo_basico = any(campo in dados for campo in ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m'])
+
+    if tem_fluxo_basico:
+        campos_obrigatorios_basicos = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
+        for campo in campos_obrigatorios_basicos:
+            if campo not in dados:
+                return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
+        try:
+            diametro_mm = float(dados['diametro_mm'])
+            vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
+            espacamento_m = float(dados['espacamento_m'])
+            comprimento_m = float(dados['comprimento_m'])
+        except ValueError:
+            return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
+
+        resultado_basico = calculador.calcular_perda_carga(
+            diametro_mm, vazao_gotejador_lh, espacamento_m, comprimento_m
+        )
+        if "erro" in resultado_basico:
+            return jsonify(resultado_basico), 400
+        resultado_final.update(resultado_basico)
+
+    # Advanced Flow: Pressure Profiles
+    tem_fluxo_avancado = any(campo in dados for campo in ['So', 'k_linha', 'L_estimado', 'declividade', 'H', 'Hvar'])
+
+    if tem_fluxo_avancado:
+        if 'So' not in dados or 'k_linha' not in dados or 'L_estimado' not in dados:
+             return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+        try:
+            So = float(dados['So'])
+            k_linha = float(dados['k_linha'])
+            L_estimado = float(dados['L_estimado'])
+
+            classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+            resultado_final["classificacao"] = classificacao
+
+            if classificacao == 'Perfil Tipo IId (Declive Muito Forte)' and 'H' in dados and 'Hvar' in dados:
+                H = float(dados['H'])
+                Hvar = float(dados['Hvar'])
+                L_max = calculador.calcular_lmax_perfil_tipo_IId(H, Hvar, So, k_linha, L_estimado)
+                resultado_final["L_max"] = round(L_max, 2)
+        except ValueError as e:
+            if "Restrição de limite físico não atendida" in str(e):
+                 return jsonify({"erro": str(e)}), 400
+            return jsonify({"erro": "Os valores do fluxo avançado devem ser numéricos."}), 400
+
+    if not tem_fluxo_basico and not tem_fluxo_avancado:
+         return jsonify({"erro": "Parâmetros insuficientes para realizar cálculos hidráulicos."}), 400
+
+    return jsonify(resultado_final), 200
 
     if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
