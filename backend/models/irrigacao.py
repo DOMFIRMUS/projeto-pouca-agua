@@ -454,3 +454,23 @@ class CalculadorIrrigacao:
         hfl_l = self.perda_conector_lateral(diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms)
         pressao_inicial = pressao_emissor + perda_carga_tubulacao + hfl_l
         return pressao_inicial
+
+    def otimizar_escalonamento_rega(self, irn_max, etc, sp, sr, itn, vazao_gotejador, emissores_planta):
+        """
+        Otimiza o tempo e turno de rega.
+        """
+        if etc <= 0 or sp <= 0 or sr <= 0 or emissores_planta <= 0 or vazao_gotejador <= 0:
+            return 0, 0.0, 0
+
+        # Turno de Rega Máximo (Equação 44)
+        tr_max = math.floor(irn_max / (etc * sp * sr))
+
+        # Tempo de Irrigação (TI) em horas (Equação 45)
+        ti_horas = (itn * sp * sr) / (emissores_planta * vazao_gotejador)
+
+        # Número ideal de subunidades de campo
+        num_subunidades_sugeridas = 0
+        if ti_horas > 0:
+            num_subunidades_sugeridas = math.floor(24.0 / ti_horas)
+
+        return tr_max, ti_horas, num_subunidades_sugeridas
