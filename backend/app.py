@@ -68,6 +68,41 @@ def obter_status():
             }
         )
 
+    # 1. Executa cálculos científicos baseados na Tese
+    metodo_eto = request.args.get('metodo_eto', 'hargreaves')
+    t_media = (temperatura_max + temperatura_min) / 2
+
+    if metodo_eto.lower() == 'blaney-criddle':
+        eto = calculador.calcular_eto_blaney_criddle(
+            t_media,
+            mes_index=dados_sistema["mes_atual"]
+        )
+    else:
+        eto = calculador.calcular_eto_hargreaves(
+            temperatura_max,
+            temperatura_min,
+            latitude=-22.0,
+            mes_index=dados_sistema["mes_atual"]
+        )
+
+    cad, irn_max = calculador.calcular_irn_e_cad(
+        dados_sistema["solo_cc"],
+        dados_sistema["solo_pmp"],
+        dados_sistema["profundidade_raiz_m"],
+        dados_sistema["fator_deplecao_f"],
+        dados_sistema["porcentagem_umedecida_pw"],
+        etc_calculada=eto
+    )
+
+    # Cálculo do Turno de Rega Máximo (TR_max)
+    # Assumindo etc_mm_dia aproximadamente igual a eto para simplificação (Kc = 1.0)
+    turno_rega_max_dias = calculador.calcular_turno_rega_max(
+        irn_max_mm=irn_max,
+        etc_mm_dia=eto,
+        sp_m=dados_sistema["espacamento_plantas_m"],
+        sr_m=dados_sistema["espacamento_fileiras_m"]
+    )
+    # Verifica se foi enviada a condutividade elétrica da água via query params
     ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
     metodo_eto = request.args.get('metodo_eto', 'hargreaves')
     calc = _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agua_ds_m, metodo_eto)
@@ -116,6 +151,14 @@ def obter_status():
         "turno_rega_max_dias": calc["turno_rega_max_dias"],
         "lamina_bruta_irrigacao_mm": calc["itn"],
         "metricas_tese": {
+            "evapotranspiracao_referencia_mm_dia": eto,
+            "capacidade_agua_disponivel_solo_mm": cad,
+            "irrigacao_real_necessaria_max_mm": irn_max,
+            "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
+            "tempo_irrigacao_horas": ti_horas,
+            "numero_emissores_por_planta": np_emissores,
+            "fracao_lixiviacao": fl,
+            "irrigacao_total_necessaria_mm": itn
             "evapotranspiracao_referencia_mm_dia": calc["eto"],
             "capacidade_agua_disponivel_solo_mm": calc["cad"],
             "irrigacao_real_necessaria_max_mm": calc["irn_max"],
@@ -470,6 +513,55 @@ def obter_classificacao_perfil():
 @app.route('/api/hidraulica', methods=['POST'])
 def hidraulica():
     dados = request.get_json()
+
+    if not dados:
+        return jsonify({"erro": "Nenhum dado enviado"}), 400
+
+    # Determina qual lógica usar com base nos campos presentes
+    if 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
+        if 'So' not in dados or 'k_linha' not in dados or 'L_estimado' not in dados:
+            return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+        try:
+            So = float(dados['So'])
+            k_linha = float(dados['k_linha'])
+            L_estimado = float(dados['L_estimado'])
+        except ValueError:
+            return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+
+        # Mapeamento alterado devido ao mock que foi inserido anteriormente
+        if hasattr(calculador, 'classificar_perfil_topografico'):
+             classificacao = calculador.classificar_perfil_topografico(So, k_linha, L_estimado)
+        else:
+             classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+             classificacao = {"classificacao": classificacao}
+
+        return jsonify(classificacao), 200
+    else:
+        campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
+
+        for campo in campos_obrigatorios:
+            if campo not in dados:
+                return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
+
+        try:
+            diametro_mm = float(dados['diametro_mm'])
+            vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
+            espacamento_m = float(dados['espacamento_m'])
+            comprimento_m = float(dados['comprimento_m'])
+        except ValueError:
+            return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
+
+        resultado = calculador.calcular_perda_carga(
+            diametro_mm,
+            vazao_gotejador_lh,
+            espacamento_m,
+            comprimento_m
+        )
+
+        if "erro" in resultado:
+            return jsonify(resultado), 400
+
+        return jsonify(resultado), 200
     if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
