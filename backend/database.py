@@ -37,6 +37,19 @@ def init_db():
             max_ce REAL DEFAULT 3.0
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS projetos_metadados (
+            codigo_projeto TEXT PRIMARY KEY UNIQUE,
+            nome_projeto TEXT,
+            nome_propriedade TEXT,
+            nome_proprietario TEXT,
+            nome_projetista TEXT,
+            codigo_subunidade TEXT,
+            area_total_irrigada REAL,
+            area_subunidade REAL,
+            data_elaboracao TEXT
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -71,6 +84,33 @@ def get_culturas():
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+def insert_projeto(dados):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO projetos_metadados (
+                codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario,
+                nome_projetista, codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            dados.get('codigo_projeto'),
+            dados.get('nome_projeto'),
+            dados.get('nome_propriedade'),
+            dados.get('nome_proprietario'),
+            dados.get('nome_projetista'),
+            dados.get('codigo_subunidade'),
+            dados.get('area_total_irrigada'),
+            dados.get('area_subunidade'),
+            dados.get('data_elaboracao')
+        ))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
 
 def insert_leitura(umidade, temperatura_max, temperatura_min):
     conn = get_db_connection()

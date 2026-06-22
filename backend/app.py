@@ -3,7 +3,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from models.irrigacao import CalculadorIrrigacao
 import datetime
-from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas
+from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, insert_projeto
 
 app = Flask(__name__)
 CORS(app)
@@ -260,6 +260,7 @@ def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
 
+@app.route('/api/classificar_perfil', methods=['POST'])
 @app.route('/api/hidraulica', methods=['POST'])
 def processar_hidraulica():
     dados = request.get_json()
@@ -368,6 +369,19 @@ def processar_hidraulica():
     return jsonify(resultado_final), 200
 
 
+
+@app.route('/api/projetos', methods=['POST'])
+def criar_projeto():
+    dados = request.get_json()
+    if not dados or 'codigo_projeto' not in dados:
+        return jsonify({"erro": "O campo 'codigo_projeto' é obrigatório."}), 400
+
+    sucesso = insert_projeto(dados)
+
+    if not sucesso:
+        return jsonify({"erro": "Este Código já existe"}), 400
+
+    return jsonify({"status": "sucesso", "mensagem": "Projeto criado com sucesso"}), 201
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
