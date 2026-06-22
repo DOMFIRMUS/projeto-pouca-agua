@@ -173,6 +173,7 @@ def obter_status():
             "irrigacao_real_necessaria_max_mm": irn_max,
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
+            "fracao_lixiviacao": fl,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
             "fracao_lixiviacao": fl,
             "fracao_lixiviacao": fl,
@@ -232,31 +233,49 @@ def perda_carga():
     if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
-    campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
+    # Branch 1: Profile classification
+    if 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
+        if 'So' not in dados or 'k_linha' not in dados or 'L_estimado' not in dados:
+            return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+        try:
+            So = float(dados['So'])
+            k_linha = float(dados['k_linha'])
+            L_estimado = float(dados['L_estimado'])
+            classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
+            return jsonify({"classificacao": classificacao}), 200
+        except ValueError:
+            return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
 
+    # Branch 2: Head loss computation
+    campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
+    falta_campo = [c for c in campos_obrigatorios if c not in dados]
+
+    if not falta_campo:
+        try:
+            diametro_mm = float(dados['diametro_mm'])
+            vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
+            espacamento_m = float(dados['espacamento_m'])
+            comprimento_m = float(dados['comprimento_m'])
+            resultado = calculador.calcular_perda_carga(
+                diametro_mm,
+                vazao_gotejador_lh,
+                espacamento_m,
+                comprimento_m
+            )
+            if "erro" in resultado:
+                return jsonify(resultado), 400
+            return jsonify(resultado), 200
+        except ValueError:
+            return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
+
+    # If it falls through, it's missing fields for both
+    # The tests check specifically for diametro_mm being the first required field if nothing else matches
     for campo in campos_obrigatorios:
         if campo not in dados:
             return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
 
-    try:
-        diametro_mm = float(dados['diametro_mm'])
-        vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
-        espacamento_m = float(dados['espacamento_m'])
-        comprimento_m = float(dados['comprimento_m'])
-    except ValueError:
-        return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
+    return jsonify({"erro": "Parâmetros inválidos"}), 400
 
-    resultado = calculador.calcular_perda_carga(
-        diametro_mm,
-        vazao_gotejador_lh,
-        espacamento_m,
-        comprimento_m
-    )
-
-    if "erro" in resultado:
-        return jsonify(resultado), 400
-
-    return jsonify(resultado), 200
 @app.route('/api/culturas', methods=['GET'])
 def obter_culturas():
     culturas = get_culturas()
