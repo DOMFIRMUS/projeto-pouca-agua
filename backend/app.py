@@ -25,9 +25,9 @@ dados_sistema = {
     "espacamento_plantas_sp": 0.5,
     "espacamento_fileiras_sr": 1.0,
     "dw_diametro_molhado": 0.3,
-    "vazao_emissor_qa": 2.0
+    "vazao_emissor_qa": 2.0,
     "espacamento_plantas_m": 0.5,   # Espaçamento entre plantas na fileira
-    "espacamento_fileiras_m": 1.0   # Espaçamento entre fileiras
+    "espacamento_fileiras_m": 1.0,  # Espaçamento entre fileiras
     "ce_solo_min": 1.0,             # Condutividade elétrica mínima do solo suportada (dS/m) - padrão
     "ce_solo_max": 3.0,             # Condutividade elétrica máxima tolerada pela cultura (dS/m)
     "uniformidade_emissao_decimal": 0.90 # Uniformidade de emissão do gotejador (90%)
@@ -47,8 +47,13 @@ def obter_status():
 
     culturas = get_culturas()
     kc_atual = 1.0 # Default fallback
+    min_ce = dados_sistema["ce_solo_min"]
+    max_ce = dados_sistema["ce_solo_max"]
+
     if culturas:
         cultura_ativa = culturas[0]
+        min_ce = cultura_ativa.get('min_ce', dados_sistema["ce_solo_min"])
+        max_ce = cultura_ativa.get('max_ce', dados_sistema["ce_solo_max"])
         kc_atual = calculador.obter_kc_atual(
             data_plantio=cultura_ativa['data_plantio'],
             dias_fases={
@@ -96,14 +101,15 @@ def obter_status():
         etc_mm_dia=eto,
         sp_m=dados_sistema["espacamento_plantas_m"],
         sr_m=dados_sistema["espacamento_fileiras_m"]
+    )
     # Verifica se foi enviada a condutividade elétrica da água via query params
     ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
 
     fl, itn = calculador.calcular_itn(
         irn_max,
         ce_agua_ds_m,
-        dados_sistema["ce_solo_min"],
-        dados_sistema["ce_solo_max"],
+        min_ce,
+        max_ce,
         dados_sistema["uniformidade_emissao_decimal"]
     )
 
@@ -139,6 +145,9 @@ def obter_status():
     # Atualiza o status e o tempo calculado no banco de dados
     update_leitura_status(leitura_id, analise["status"], tempo_irrigacao_calculado_minutos)
 
+    if ce_agua_ds_m > min_ce:
+        analise["mensagem"] += " Alerta: Ocorrerá decréscimo na produtividade."
+
     return jsonify({
         "umidade_atual": umidade_atual,
         "status_solo": analise["status"],
@@ -155,8 +164,7 @@ def obter_status():
             "irrigacao_real_necessaria_max_mm": irn_max,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
             "tempo_irrigacao_horas": ti_horas,
-            "numero_emissores_por_planta": np_emissores
-            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos
+            "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn,
             "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0)
@@ -232,7 +240,7 @@ def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
 
-@app.route('/api/hidraulica', methods=['POST'])
+@app.route('/api/classificar_hidraulica', methods=['POST'])
 def obter_hidraulica():
     dados_recebidos = request.get_json()
     if not dados_recebidos or 'So' not in dados_recebidos or 'k_linha' not in dados_recebidos or 'L_estimado' not in dados_recebidos:
