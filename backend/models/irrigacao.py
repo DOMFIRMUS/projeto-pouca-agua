@@ -225,6 +225,20 @@ class CalculadorIrrigacao:
 
         hfl_d = 0.043695 * (vel_derivacao_vd ** 1.897) * (diametro_derivacao_dd ** -2.428) * (area_protrusao_ap ** 1.109)
         return round(hfl_d, 4)
+
+    def calcular_hfl_direta_vilaca(self, v_D, D_D, A_P):
+        """
+        Calcula a Perda Localizada de Carga por Passagem Direta em conectores (Modelo de Vilaça, Eq 76).
+        """
+        if not (0.133 <= v_D <= 3.0):
+            return {"validacao_modelo_direto": "fora_dos_limites"}
+        if not (0.0357 <= D_D <= 0.0721):
+            return {"validacao_modelo_direto": "fora_dos_limites"}
+        if not (103e-6 <= A_P <= 355e-6):
+            return {"validacao_modelo_direto": "fora_dos_limites"}
+
+        hfl_d = 0.043695 * (v_D ** 1.897) * (D_D ** -2.428) * (A_P ** 1.109)
+        return round(hfl_d, 4)
     def calcular_turno_rega_max(self, irn_max_mm, etc_mm_dia, sp_m, sr_m):
         """
         Calcula o Turno de Rega Máximo (TR_max) baseado na Equação 44 da tese.
