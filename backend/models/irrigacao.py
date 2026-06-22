@@ -33,6 +33,36 @@ class CalculadorIrrigacao:
             40: [43.3, 38.3, 30.9, 22.2, 15.8, 12.8, 13.9, 19.1, 27.1, 35.1, 41.8, 44.6],
         }
 
+    def calcular_pressao_saturacao_es(self, t_max, t_min):
+        """
+        Calcula a Pressão de Saturação de Vapor (es) média usando o método de Penman-Monteith (FAO56).
+        Equação 14: e_o(T) = 0.6108 * exp[(17.27 * T) / (T + 273.3)]
+        Equação 13: es = (e_o(T_max) + e_o(T_min)) / 2
+        Retorna em kPa.
+        """
+        def eo(t):
+            return 0.6108 * math.exp((17.27 * t) / (t + 273.3))
+
+        eo_tmax = eo(t_max)
+        eo_tmin = eo(t_min)
+        es = (eo_tmax + eo_tmin) / 2.0
+        return es
+
+    def calcular_pressao_atual_ea(self, es, umidade_relativa_media_ur):
+        """
+        Calcula a Pressão Atual de Vapor (ea) usando a umidade relativa.
+        Equação 15: ea = es * (UR_m / 100)
+        Retorna em kPa.
+        """
+        return es * (umidade_relativa_media_ur / 100.0)
+
+    def calcular_deficit_pressao_vapor(self, es, ea):
+        """
+        Calcula o Déficit de Pressão de Vapor (es - ea).
+        Retorna em kPa.
+        """
+        return es - ea
+
     def obter_radiacao_solar_ra(self, latitude_sul, mes_index):
         """
         Obtém a radiação solar (Ra) com base na latitude sul e no mês do ano.
