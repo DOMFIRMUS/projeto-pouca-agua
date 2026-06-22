@@ -477,6 +477,104 @@ class CalculadorIrrigacao:
             return 'Perfil Tipo IIc (Declive Forte)'
         else:
             return 'Perfil Tipo IId (Declive Muito Forte)'
+
+    def orquestrar_dimensionamento_declive(self, H, Hvar, So, k_linha):
+        """
+        Orquestrador de busca de perfis hidráulicos segundo a página 37 da tese.
+        """
+        def eval_ratio(So, k_linha, L):
+            if isinstance(L, complex):
+                L = L.real
+            denom = k_linha * (abs(L) ** 1.75)
+            if denom == 0: denom = 1e-6
+            return So / denom
+
+        if So > 0:
+            # Passo 1: Perfil Tipo II-a (Declive Fraco)
+            L = 50.0
+            for _ in range(500):
+                if isinstance(L, complex): L = L.real
+                L = abs(L)
+                ratio = eval_ratio(So, k_linha, L)
+                base_ratio = max(0, ratio)
+                razao_lL = 1 - 0.56098 * (base_ratio ** 0.57143)
+
+                base_term = max(0, 1 - razao_lL)
+
+                denom = (((1 - (base_term ** 2.35)) * k_linha * (L ** 1.33)) - (razao_lL * So))
+                if denom == 0: denom = 1e-6
+
+                L_novo = (H * Hvar) / denom
+
+                if abs(L_novo - L) < 0.001:
+                    L = L_novo
+                    break
+                L = L_novo
+
+            ratio = eval_ratio(So, k_linha, L)
+            if 0 < ratio < 1:
+                return {"comprimento_l_m": round(L.real, 2), "perfil_classificado": "Perfil Tipo II-a (Declive Fraco)"}
+
+            # Passo 2: Perfil Tipo II-c (Declive Forte)
+            L = 50.0
+            for _ in range(500):
+                if isinstance(L, complex): L = L.real
+                L = abs(L)
+                ratio = eval_ratio(So, k_linha, L)
+                base_ratio = max(0, ratio)
+                razao_lL = 1 - 0.56098 * (base_ratio ** 0.57143)
+                base_term = max(0, 1 - razao_lL)
+
+                k_L175 = k_linha * (L ** 1.75)
+                denom = So - k_L175 + (1 - (base_term**2.75)) * k_L175 - Hvar * (So - k_L175)
+                if denom == 0: denom = 1e-6
+                L_novo = (H * Hvar) / denom
+
+                if abs(L_novo - L) < 0.001:
+                    L = L_novo
+                    break
+                L = L_novo
+
+            ratio = eval_ratio(So, k_linha, L)
+            if 1 < ratio < 2.75:
+                return {"comprimento_l_m": round(L.real, 2), "perfil_classificado": "Perfil Tipo II-c (Declive Forte)"}
+
+            # Passo 3: Perfil Tipo II-d (Declive Muito Forte)
+            L = 50.0
+            for _ in range(500):
+                if isinstance(L, complex): L = L.real
+                L = abs(L)
+                k_L175 = k_linha * (L ** 1.75)
+                denom = (So - k_L175) * (1 - Hvar)
+                if denom == 0: denom = 1e-6
+                L_novo = (H * Hvar) / denom
+
+                if abs(L_novo - L) < 0.001:
+                    L = L_novo
+                    break
+                L = L_novo
+
+            ratio = eval_ratio(So, k_linha, L)
+            if ratio >= 2.75:
+                return {"comprimento_l_m": round(L.real, 2), "perfil_classificado": "Perfil Tipo II-d (Declive Muito Forte)"}
+
+        # Passo 4: Fallback (Perfil Tipo I/III - Nível ou Aclive)
+        L = 50.0
+        for _ in range(500):
+            if isinstance(L, complex): L = L.real
+            L = abs(L)
+            k_L175 = k_linha * (L ** 1.75)
+            denom = k_L175 + So
+            if denom == 0: denom = 1e-6
+            L_novo = (H * Hvar) / denom
+
+            if abs(L_novo - L) < 0.001:
+                L = L_novo
+                break
+            L = L_novo
+
+        if isinstance(L, complex): L = L.real
+        return {"comprimento_l_m": round(L, 2), "perfil_classificado": "Perfil Tipo I/III (Nível ou Aclive)"}
     def calcular_lmax_perfil_tipo_I(self, H, Hvar, So, k_linha):
         """
         Calcula o comprimento máximo da linha lateral em Perfil Tipo I (Aclive)

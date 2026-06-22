@@ -234,6 +234,18 @@ def obter_culturas():
     culturas = get_culturas()
     return jsonify(culturas), 200
 
+@app.route('/api/classificar_perfil', methods=['POST'])
+def classificar_perfil():
+    dados_recebidos = request.get_json()
+    if not dados_recebidos or 'So' not in dados_recebidos or 'k_linha' not in dados_recebidos or 'L_estimado' not in dados_recebidos:
+        return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
+
+    try:
+        So = float(dados_recebidos['So'])
+        k_linha = float(dados_recebidos['k_linha'])
+        L_estimado = float(dados_recebidos['L_estimado'])
+    except ValueError:
+        return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
 @app.route('/api/hidraulica', methods=['POST'])
 def processar_hidraulica():
     dados = request.get_json()
