@@ -466,6 +466,16 @@ def test_calcular_rn():
     exp_rn = 15.0 - exp_rnl
     assert round(r_nl_neg, 4) == round(exp_rnl, 4)
     assert round(r_n_neg, 4) == round(exp_rn, 4)
+def test_calcular_rns():
+    calc = CalculadorIrrigacao()
+    rso, rns = calc.calcular_rns(rs=20.0, ra=35.0, altitude_m=1000.0)
+
+    # Rso = [0.75 + 2 * (1000 / 100000)] * 35.0
+    # Rso = [0.75 + 0.02] * 35.0 = 0.77 * 35.0 = 26.95
+    assert rso == 26.95
+
+    # Rns = 0.77 * 20.0 = 15.40
+    assert rns == 15.40
 def test_calcular_constante_psicrometrica():
     calc = CalculadorIrrigacao()
 
