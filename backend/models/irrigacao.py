@@ -812,6 +812,31 @@ class CalculadorIrrigacao:
         pressao_inicial = pressao_emissor + perda_carga_tubulacao + hfl_l
         return pressao_inicial
 
+    def selecionar_tubo_comercial_otimo(self, diametro_teorico, f, Q, L, dz):
+        """
+        Escolha de tubos comerciais por aproximação de menor módulo descrita na página 40 da tese.
+        """
+        diametros_comerciais = [0.025, 0.032, 0.040, 0.050, 0.063, 0.075]
+
+        inferiores = [d for d in diametros_comerciais if d <= diametro_teorico]
+        superiores = [d for d in diametros_comerciais if d >= diametro_teorico]
+
+        d_inferior = inferiores[-1] if inferiores else diametros_comerciais[0]
+        d_superior = superiores[0] if superiores else diametros_comerciais[-1]
+
+        tubos_selecionados = list(set([d_inferior, d_superior]))
+
+        melhor_d = None
+        menor_erro = float('inf')
+
+        for d in tubos_selecionados:
+            hf = 8.263e-2 * f * (Q ** 2) / (d ** 5) * L
+            erro = abs(hf - dz)
+            if erro < menor_erro:
+                menor_erro = erro
+                melhor_d = d
+
+        return melhor_d
     def calcular_rn(self, t_max_c, t_min_c, ea, rs, rso, rns):
         """
         Calcula a Radiação de Onda Longa (Rnl) e o Saldo de Radiação (Rn)
