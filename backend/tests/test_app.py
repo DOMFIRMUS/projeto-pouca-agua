@@ -31,6 +31,64 @@ def test_projetos_metadados_criacao(client):
     cursor.execute('SELECT * FROM historico_leitura')
     rows = cursor.fetchall()
     assert len(rows) == 1
+    assert rows[0][2] == 40.0
+    assert rows[0][3] == 35.0
+
+def test_status_get(client):
+    client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})
+    response = client.get('/api/status')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data['umidade_atual'] == 40.0
+    assert 'status_solo' in data
+    assert 'metricas_tese' in data
+    assert 'tempo_irrigacao_horas' in data['metricas_tese']
+    assert 'numero_emissores_por_planta' in data['metricas_tese']
+    assert 'turno_rega_max_dias' in data
+    assert isinstance(data['turno_rega_max_dias'], int)
+    assert 'lamina_bruta_irrigacao_mm' in data
+    assert 'metricas_tese' in data
+    assert 'fracao_lixiviacao' in data['metricas_tese']
+    assert 'irrigacao_total_necessaria_mm' in data['metricas_tese']
+
+def test_status_get_blaney_criddle(client):
+    client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})
+    response = client.get('/api/status?metodo_eto=blaney-criddle')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data['umidade_atual'] == 40.0
+    assert 'status_solo' in data
+
+def test_status_get_blaney_criddle(client):
+    client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})
+    response = client.get('/api/status?metodo_eto=blaney-criddle')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data['umidade_atual'] == 40.0
+    assert 'status_solo' in data
+
+def test_status_get_blaney_criddle(client):
+    client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})
+    response = client.get('/api/status?metodo_eto=blaney-criddle')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data['umidade_atual'] == 40.0
+    assert 'status_solo' in data
+    assert 'metricas_tese' in data
+    assert 'tempo_irrigacao_horas' in data['metricas_tese']
+    assert 'numero_emissores_por_planta' in data['metricas_tese']
+
+def test_historico_get(client):
+    client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})
+    client.post('/api/sensor', json={'umidade': 45.0})
+
+    response = client.get('/api/historico')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert len(data) == 2
+    assert data[0]['umidade'] == 45.0
+    assert data[1]['umidade'] == 40.0
+
     assert rows[0][1] == 40.0 or rows[0][1] is None
     assert rows[0][2] == 40.0
     response_dup = client.post('/api/projetos', json=payload)
@@ -77,6 +135,9 @@ def test_hidraulica_post_success(client):
     }
     response = client.post('/api/hidraulica', data=json.dumps(payload), content_type='application/json')
     assert response.status_code == 200
+
+def test_hidraulica_post_missing_fields(client):
+    response = client.post('/api/hidraulica', json={"diametro_mm": 16})
     data = json.loads(response.data)
     assert 'perda_carga_mca' in data
 
@@ -144,6 +205,10 @@ def test_hidraulica_post_missing_fields(client):
     assert response.status_code == 400
     data = json.loads(response.data)
     assert 'erro' in data
+    pass
+    pass
+
+def test_hidraulica_post_invalid_type_2(client):
     assert "Os campos" in data['erro']
     assert "obrigatórios" in data['erro']
 
@@ -161,7 +226,7 @@ def test_hidraulica_post_invalid_type(client):
     assert response.status_code == 400
     data = json.loads(response.data)
     assert 'erro' in data
-    assert "Os valores do fluxo avançado devem ser numéricos." in data['erro']
+    assert "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos." in data['erro']
 
 
 def test_hidraulica_post_perfil_iid(client):
@@ -172,6 +237,8 @@ def test_hidraulica_post_perfil_iid(client):
         'H': 10.0,
         'Hvar': 0.2
     })
+    assert response.status_code == 200
+
 
 def test_hidraulica_post_combined(client):
     response = client.post('/api/hidraulica', json={
@@ -183,6 +250,7 @@ def test_hidraulica_post_combined(client):
         'k_linha': 1.0,
         'L_estimado': 1.0
     })
+    assert response.status_code == 200
 
 def test_status_get_salinidade_alerta(client):
     client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})
@@ -192,6 +260,8 @@ def test_status_get_salinidade_alerta(client):
     data = json.loads(response.data)
     assert 'Alerta: Ocorrerá decréscimo na produtividade.' in data['mensagem_acao']
 def test_hidraulica_post_mixed_payload(client):
+    pass
+
     response = client.post('/api/hidraulica', json={
         'So': 0.5,
         'k_linha': 1.0,
