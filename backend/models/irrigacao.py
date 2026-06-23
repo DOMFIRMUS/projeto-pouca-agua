@@ -2,6 +2,17 @@ import math
 import datetime
 
 class CalculadorIrrigacao:
+
+    def definir_kc_por_estagio(self, kc_inicial, kc_media, kc_final, estagio):
+        if estagio == 'inicial':
+            return kc_inicial
+        elif estagio == 'meia_estacao':
+            return kc_media
+        elif estagio == 'final':
+            return kc_final
+        else:
+            return kc_media
+
     def __init__(self):
         # Parâmetros agronómicos padrão (Ex: Tomate / Cana-de-açúcar)
         self.umidade_critica = 40.0
@@ -143,6 +154,8 @@ class CalculadorIrrigacao:
     def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
         pass
         pass
+        pass # stub
+
     def calcular_pressao_atual_ea(self, es, umidade_relativa_media_ur):
         """
         Calcula a Pressão Atual de Vapor (ea) em kPa.
@@ -160,8 +173,8 @@ class CalculadorIrrigacao:
     def calcular_eto_blaney_criddle(self, t_media, mes_index):
         pass
         pass
+    def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
         """
-        Calcula a Evapotranspiração de Referência (ETo em mm/dia) usando o método de Blaney-Criddle-FAO.
         Baseado na Tabela 3 - Percentagem diária de horas anuais de luz solar (P) para Latitude Sul.
         """
         # Tabela 3 - Percentagem diária de horas anuais de luz solar (Latitudes Sul)
@@ -710,6 +723,241 @@ class CalculadorIrrigacao:
                 return L_novo
 
             L_atual = L_novo
+            iteracoes += 1
+
+        raise ValueError("A iteração para calcular L não convergiu após 1000 passos.")
+
+    def calcular_porcentagem_area_sombreada_ps(self, tipo_calculo, params):
+        if tipo_calculo not in ['faixa_sombreada', 'diametro_copa']:
+            raise ValueError('Método de cálculo de área sombreada inválido ou dados insuficientes.')
+
+        ps = 0.0
+
+        if tipo_calculo == 'faixa_sombreada':
+            ss_largura = params.get('ss_largura')
+            sr_espacamento = params.get('sr_espacamento')
+
+            if ss_largura is None or sr_espacamento is None:
+                raise ValueError('Método de cálculo de área sombreada inválido ou dados insuficientes.')
+
+            if sr_espacamento <= 0:
+                return 0.0
+
+            # Equação 28
+            ps = (ss_largura / sr_espacamento) * 100.0
+
+        elif tipo_calculo == 'diametro_copa':
+            dco_diametro = params.get('dco_diametro')
+            sr_espacamento = params.get('sr_espacamento')
+            sp_espacamento = params.get('sp_espacamento')
+
+            if dco_diametro is None or sr_espacamento is None or sp_espacamento is None:
+                raise ValueError('Método de cálculo de área sombreada inválido ou dados insuficientes.')
+
+            if sr_espacamento <= 0 or sp_espacamento <= 0:
+                return 0.0
+
+            # Equação 29
+            area_copa = math.pi * ((dco_diametro ** 2) / 4.0)
+            area_plantio = sr_espacamento * sp_espacamento
+            ps = (area_copa / area_plantio) * 100.0
+
+        # Normalização limitando o teto matemático a 100.0 e arredondando para 2 casas
+        ps = min(ps, 100.0)
+        return round(ps, 2)
+    def calcular_lmax_perfil_tipo_IIa(self, H, Hvar, So, k_linha, chute_inicial=50.0):
+        L = chute_inicial
+        iteracoes = 0
+        while iteracoes < 1000:
+            iteracoes += 1
+
+    def _calcular_condicao_59(self, So, k_linha, L):
+        # Condição da Equação 59
+        condicao = So / (k_linha * (L ** 1.75))
+        if not (0 < condicao < 1):
+            raise ValueError(f"Condição da Equação 59 não satisfeita (deve estar entre 0 e 1): {condicao}")
+
+            # Equação 61
+            razao_lL = 1 - 0.56098 * (condicao ** 0.57143)
+
+            # Equação 60
+            numerador = H * Hvar
+            denominador = ((1 - ((1 - razao_lL) ** 2.35)) * k_linha * (L ** 1.33)) - (razao_lL * So)
+
+            if denominador == 0:
+                 raise ZeroDivisionError("Divisão por zero ao calcular o novo comprimento L.")
+
+            L_novo = numerador / denominador
+
+            # Critério de paragem
+            if abs(L_novo - L) < 0.001:
+                return round(L_novo, 3)
+
+            L = L_novo
+
+        raise Exception("O cálculo não convergiu após o número máximo de iterações.")
+
+    def classificar_perfil_pressao(self, So, k_linha, L_estimado):
+        """
+        Classifica o perfil de pressão hidráulica baseado na tese.
+        So: declividade em decimal
+        k_linha: constante da linha
+        L_estimado: comprimento estimado
+        """
+        if So <= 0:
+            return 'Perfil Tipo I (Aclive ou Nível)'
+
+        J = k_linha * (L_estimado ** 1.75)
+        razao = So / J
+
+        if 0 < razao < 1:
+            return 'Perfil Tipo IIa (Declive Fraco)'
+        elif razao == 1:
+            return 'Perfil Tipo IIb (Declive Moderado)'
+        elif 1 < razao < 2.75:
+            return 'Perfil Tipo IIc (Declive Forte)'
+        else:
+            return 'Perfil Tipo IId (Declive Muito Forte)'
+
+    def calcular_lmax_perfil_tipo_IIb(self, H, Hvar, So, k_linha, L_estimado):
+        """
+        Calcula o Comprimento Máximo da Linha Lateral para Perfil Tipo II-b.
+        Verifica a condição de ocorrência do Perfil Tipo II-b pela Equação 62 da tese: (k' * L^1.75) / So = 1
+        E aplica a Equação 63 se a condição for atendida.
+        """
+        if So <= 0:
+            return None
+
+        razao = (k_linha * (L_estimado ** 1.75)) / So
+
+        if math.isclose(razao, 1.0, rel_tol=1e-4, abs_tol=1e-4):
+            # Equação 63: L = (H * Hvar) / (0.357 * So)
+            L = (H * Hvar) / (0.357 * So)
+            return L
+
+        return None
+    def orquestrar_dimensionamento_declive(self, H, Hvar, So, k_linha):
+        """
+        Orquestrador de busca de perfis hidráulicos segundo a página 37 da tese.
+        """
+        def eval_ratio(So, k_linha, L):
+            if isinstance(L, complex):
+                L = L.real
+            denom = k_linha * (abs(L) ** 1.75)
+            if denom == 0: denom = 1e-6
+            return So / denom
+
+        if So > 0:
+            # Passo 1: Perfil Tipo II-a (Declive Fraco)
+            L = 50.0
+            for _ in range(500):
+                if isinstance(L, complex): L = L.real
+                L = abs(L)
+                ratio = eval_ratio(So, k_linha, L)
+                base_ratio = max(0, ratio)
+                razao_lL = 1 - 0.56098 * (base_ratio ** 0.57143)
+
+                base_term = max(0, 1 - razao_lL)
+
+                denom = (((1 - (base_term ** 2.35)) * k_linha * (L ** 1.33)) - (razao_lL * So))
+                if denom == 0: denom = 1e-6
+
+                L_novo = (H * Hvar) / denom
+
+                if abs(L_novo - L) < 0.001:
+                    L = L_novo
+                    break
+                L = L_novo
+
+            ratio = eval_ratio(So, k_linha, L)
+            if 0 < ratio < 1:
+                return {"comprimento_l_m": round(L.real, 2), "perfil_classificado": "Perfil Tipo II-a (Declive Fraco)"}
+
+            # Passo 2: Perfil Tipo II-c (Declive Forte)
+            L = 50.0
+            for _ in range(500):
+                if isinstance(L, complex): L = L.real
+                L = abs(L)
+                ratio = eval_ratio(So, k_linha, L)
+                base_ratio = max(0, ratio)
+                razao_lL = 1 - 0.56098 * (base_ratio ** 0.57143)
+                base_term = max(0, 1 - razao_lL)
+
+                k_L175 = k_linha * (L ** 1.75)
+                denom = So - k_L175 + (1 - (base_term**2.75)) * k_L175 - Hvar * (So - k_L175)
+                if denom == 0: denom = 1e-6
+                L_novo = (H * Hvar) / denom
+
+                if abs(L_novo - L) < 0.001:
+                    L = L_novo
+                    break
+                L = L_novo
+
+            ratio = eval_ratio(So, k_linha, L)
+            if 1 < ratio < 2.75:
+                return {"comprimento_l_m": round(L.real, 2), "perfil_classificado": "Perfil Tipo II-c (Declive Forte)"}
+
+            # Passo 3: Perfil Tipo II-d (Declive Muito Forte)
+            L = 50.0
+            for _ in range(500):
+                if isinstance(L, complex): L = L.real
+                L = abs(L)
+                k_L175 = k_linha * (L ** 1.75)
+                denom = (So - k_L175) * (1 - Hvar)
+                if denom == 0: denom = 1e-6
+                L_novo = (H * Hvar) / denom
+
+                if abs(L_novo - L) < 0.001:
+                    L = L_novo
+                    break
+                L = L_novo
+
+            ratio = eval_ratio(So, k_linha, L)
+            if ratio >= 2.75:
+                return {"comprimento_l_m": round(L.real, 2), "perfil_classificado": "Perfil Tipo II-d (Declive Muito Forte)"}
+
+        # Passo 4: Fallback (Perfil Tipo I/III - Nível ou Aclive)
+        L = 50.0
+        for _ in range(500):
+            if isinstance(L, complex): L = L.real
+            L = abs(L)
+            k_L175 = k_linha * (L ** 1.75)
+            denom = k_L175 + So
+            if denom == 0: denom = 1e-6
+            L_novo = (H * Hvar) / denom
+
+            if abs(L_novo - L) < 0.001:
+                L = L_novo
+                break
+            L = L_novo
+
+        if isinstance(L, complex): L = L.real
+        return {"comprimento_l_m": round(L, 2), "perfil_classificado": "Perfil Tipo I/III (Nível ou Aclive)"}
+    def calcular_lmax_perfil_tipo_I(self, H, Hvar, So, k_linha):
+        """
+        Calcula o comprimento máximo da linha lateral em Perfil Tipo I (Aclive)
+        de forma iterativa utilizando a Equação 58 da tese.
+        L = (H * Hvar) / (k_linha * L^1.75 + So)
+        """
+        L_anterior = 10.0
+        while True:
+            # Equação 58
+            L_novo = (H * Hvar) / (k_linha * (L_anterior ** 1.75) + So)
+
+            # Condição de parada (diferença menor que 0.01 metros)
+            if abs(L_novo - L_anterior) < 0.01:
+                return round(L_novo, 2)
+
+            L_anterior = L_novo
+
+    def perda_conector_lateral(self, diametro_conector_m, comprimento_conector_m, vel_conector_ms, vel_lateral_ms):
+        """
+        Calcula a Perda Localizada de Carga por conexão de entrada em MCA.
+        Equação 77 da Tese (modelo de Vilaça).
+        """
+        hfl_l = 2.268121 * (diametro_conector_m ** 0.106) * (comprimento_conector_m ** 1.057) * (vel_conector_ms ** 1.766) * (vel_lateral_ms ** 0.386)
+        return hfl_l
+
     def calcular_hfl_lateral_vilaca(self, D_C, L_C, v_C, v_L):
         """
         Calcula a perda localizada de carga decorrente da mudança de direção do fluxo na inserção da linha lateral.
