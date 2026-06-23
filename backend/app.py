@@ -210,18 +210,8 @@ def obter_status():
             "tempo_irrigacao_horas": ti_horas,
             "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
-            "irrigacao_total_necessaria_mm": itn
-            "evapotranspiracao_referencia_mm_dia": calc["eto"],
-            "capacidade_agua_disponivel_solo_mm": calc["cad"],
-            "irrigacao_real_necessaria_max_mm": calc["irn_max"],
-            "tempo_irrigacao_horas": calc["ti_horas"],
-            "numero_emissores_por_planta": calc["np_emissores"],
-            "tempo_irrigacao_calculado_minutos": calc["tempo_irrigacao_calculado_minutos"],
-            "fracao_lixiviacao": calc["fl"],
-            "irrigacao_total_necessaria_mm": calc["itn"],
+            "irrigacao_total_necessaria_mm": itn,
             "deficit_pressao_vapor_kpa": calc.get("deficit_pressao_vapor_kpa", 0.0)
-            "irrigacao_total_necessaria_mm": calc["itn"]
-            "irrigacao_total_necessaria_mm": calc["itn"],
         }
     }
 
@@ -1147,6 +1137,66 @@ def calcular_e_salvar_area_sombreada(codigo_projeto):
             'tipo_calculo': tipo_calculo,
             'ps_calculado': ps_calculado,
             'mensagem': 'Área sombreada calculada e salva com sucesso'
+        }), 200
+
+    except Exception as e:
+        return jsonify({'erro': 'Erro interno do servidor', 'detalhes': str(e)}), 500
+
+
+@app.route('/api/projetos/<string:codigo_projeto>/perdas-conexoes', methods=['POST'])
+def calcular_e_salvar_perdas_conexoes(codigo_projeto):
+    try:
+        dados = request.get_json()
+        if not dados:
+            return jsonify({'erro': 'Nenhum dado JSON fornecido'}), 400
+
+        required_keys = ['v_d', 'd_d', 'a_p', 'd_c', 'l_c', 'v_c', 'v_l']
+        for k in required_keys:
+            if k not in dados or dados[k] is None:
+                return jsonify({'erro': f'Parâmetro {k} é obrigatório e não pode ser nulo.'}), 400
+
+        try:
+            v_d = float(dados['v_d'])
+            d_d = float(dados['d_d'])
+            a_p = float(dados['a_p'])
+            d_c = float(dados['d_c'])
+            l_c = float(dados['l_c'])
+            v_c = float(dados['v_c'])
+            v_l = float(dados['v_l'])
+        except ValueError:
+            return jsonify({'erro': 'Parâmetros devem ser numéricos.'}), 400
+
+        if d_d <= 0:
+            return jsonify({'erro': 'Parâmetro d_d deve ser maior que zero.'}), 400
+
+        from backend.models.irrigacao import CalculadorIrrigacao
+        calc = CalculadorIrrigacao()
+
+        validacao = calc.validar_limites_vilaca(v_d, d_d, a_p, d_c, l_c, v_c, v_l)
+        limites_status = 0 if validacao['limites_estourados'] else 1
+
+        hfl_d = calc.calcular_perda_direta_hfl_d(v_d, d_d, a_p)
+        hfl_l = calc.calcular_perda_lateral_hfl_l(d_c, l_c, v_c, v_l)
+
+        import backend.database as db
+        salvo = db.salvar_perdas_conexoes(
+            codigo_projeto=codigo_projeto,
+            v_d=v_d, d_d=d_d, a_p=a_p, hfl_d=hfl_d,
+            d_c=d_c, l_c=l_c, v_c=v_c, v_l=v_l, hfl_l=hfl_l,
+            limites_status=limites_status
+        )
+
+        if not salvo:
+            return jsonify({'erro': 'Projeto não encontrado no banco de dados'}), 404
+
+        return jsonify({
+            'status': 'sucesso',
+            'codigo_projeto': codigo_projeto,
+            'resultados': {
+                'perda_direta_hfl_d': hfl_d,
+                'perda_lateral_hfl_l': hfl_l
+            },
+            'auditoria_limites': validacao
         }), 200
 
     except Exception as e:
