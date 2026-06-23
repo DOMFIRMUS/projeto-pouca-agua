@@ -1155,3 +1155,49 @@ class CalculadorIrrigacao:
                 resultado["alerta"] = "a faixa contínua será rompida"
 
         return resultado
+
+
+    def orquestrar_etc_figura_8(self, modelo, eto, kc, pw_valor, ps_valor):
+        p_percent = max(float(pw_valor), float(ps_valor))
+        p_decimal = p_percent / 100.0
+
+        if modelo == 'fereres_1981':
+            if p_decimal <= 0.20:
+                kl = 1.94 * p_decimal + 0.10
+            elif p_decimal < 0.65:
+                kl = 1.09 * p_decimal + 0.30
+            else:
+                kl = 1.0
+        else:
+            kl = p_decimal
+
+        kl_final = max(0.0, min(1.0, kl))
+        etc = float(eto) * float(kc) * kl_final
+        return round(etc, 3)
+
+    def calcular_cad_solo(self, theta_cc, theta_pmp, profundidade_z):
+        if float(theta_cc) <= float(theta_pmp) or float(profundidade_z) <= 0:
+            return 0.0
+        cad = (float(theta_cc) - float(theta_pmp)) * float(profundidade_z) * 1000.0
+        return round(cad, 2)
+
+    def calcular_irn_e_turno_rega(self, cad, fator_f, etc, precipitacao_efetiva=0.0):
+        raw = float(cad) * float(fator_f)
+
+        if float(etc) <= 0:
+            turno_rega = 1
+        else:
+            turno_rega = math.floor(raw / float(etc))
+            if turno_rega < 1:
+                turno_rega = 1
+
+        irn = float(etc) - float(precipitacao_efetiva)
+        if irn < 0:
+            irn = 0.0
+
+        return {
+            "cad": round(float(cad), 2),
+            "raw": round(raw, 2),
+            "turno_rega": int(turno_rega),
+            "irn": round(irn, 2)
+        }
