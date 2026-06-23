@@ -4,7 +4,7 @@ import os
 # Add the backend directory to the path so we can import the module
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from models.irrigacao import CalculadorIrrigacao
+from backend.models.irrigacao import CalculadorIrrigacao
 
 def test_avaliar_status_solo_critico():
     calc = CalculadorIrrigacao()
