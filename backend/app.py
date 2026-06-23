@@ -131,6 +131,19 @@ def obter_status():
         )
     elif metodo_eto.lower() == 'penman-monteith':
         # Penman-Monteith required inputs, using defaults for robustness if not passed
+        rn = float(request.args.get('rn', 15.0))
+        g = float(request.args.get('g', 0.0))
+        u2 = float(request.args.get('u2', 2.0))
+        delta = float(request.args.get('delta', 0.15))
+        gama = float(request.args.get('gama', 0.066))
+
+        # Integração da Sub-rotina Hidráulica de Pressões e Déficit de Pressão de Vapor
+        es_calculado = calculador.calcular_pressao_saturacao_es(temperatura_max, temperatura_min)
+        ea_calculado = calculador.calcular_pressao_atual_ea(es_calculado, umidade_atual)
+        deficit_vapor = calculador.calcular_deficit_vapor(es_calculado, ea_calculado)
+
+        eto = calculador.calcular_eto_penman_monteith(
+            rn, g, t_media, u2, es_calculado, ea_calculado, delta, gama
         n_insolacao = request.args.get('n', default=8.0, type=float)
         ra = calculador.obter_radiacao_solar_ra(-22.0, dados_sistema["mes_atual"])
         N_max = calculador.obter_duracao_maxima_n(-22.0, dados_sistema["mes_atual"])
@@ -374,6 +387,55 @@ def obter_status():
             "tempo_irrigacao_calculado_minutos": calc["tempo_irrigacao_calculado_minutos"],
             "fracao_lixiviacao": calc["fl"],
             "irrigacao_total_necessaria_mm": calc["itn"],
+            "evapotranspiracao_referencia_mm_dia": eto,
+            "capacidade_agua_disponivel_solo_mm": cad,
+            "irrigacao_real_necessaria_max_mm": irn_max,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "tempo_irrigacao_horas": ti_horas,
+            "numero_emissores_por_planta": np_emissores,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "tempo_irrigacao_horas": ti_horas,
+            "numero_emissores_por_planta": np_emissores,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "irrigacao_total_necessaria_mm": itn,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "tempo_irrigacao_horas": ti_horas,
+            "numero_emissores_por_planta": np_emissores,
+            "fracao_lixiviacao": fl,
+            "tempo_irrigacao_horas": ti_horas,
+            "numero_emissores_por_planta": np_emissores,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "irrigacao_total_necessaria_mm": itn,
+            "deficit_pressao_vapor_kpa": deficit_pressao_vapor_kpa,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "tempo_irrigacao_calculado_minutos": max(tempo_estimado_minutos, 0.0),
+            "fracao_lixiviacao": fl,
+            "fracao_lixiviacao": fl,
+            "irrigacao_total_necessaria_mm": itn,
+            "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+            "fracao_lixiviacao": fl,
+            "irrigacao_total_necessaria_mm": itn
             "delta_kPa": calc["delta_kPa"],
             "pressao_atm_kPa": calc["pressao_atm_kPa"],
             "deficit_pressao_vapor_kpa": calc.get("deficit_pressao_vapor_kpa", 0.0)

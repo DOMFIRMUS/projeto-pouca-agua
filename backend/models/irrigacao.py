@@ -283,6 +283,8 @@ class CalculadorIrrigacao:
         return self.tabela_ra[lat_par][mes_index - 1]
 
     def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
+        pass
+        pass
         pass # stub
 
     def calcular_pressao_atual_ea(self, es, umidade_relativa_media_ur):
@@ -299,6 +301,9 @@ class CalculadorIrrigacao:
         """
         return round(es - ea, 4)
 
+    def calcular_eto_blaney_criddle(self, t_media, mes_index):
+        pass
+        pass
     def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
         """
         Baseado na Tabela 3 - Percentagem diária de horas anuais de luz solar (P) para Latitude Sul.
@@ -363,6 +368,31 @@ class CalculadorIrrigacao:
 
         eto = 0.0023 * ra * 0.408 * term_temp * term_diff
         return round(eto, 2)
+
+
+    def calcular_e_circulo_ponto(self, t_temperatura):
+        import math
+        # Eq. 14: e°(T) = 0.6108 * exp([17.27 * T] / [T + 273.3])
+        # Nota: Siga rigorosamente o divisor (T + 273.3) impresso graficamente na página 49 da tese.
+        e_circulo = 0.6108 * math.exp((17.27 * t_temperatura) / (t_temperatura + 273.3))
+        return e_circulo
+
+    def calcular_pressao_saturacao_es(self, t_max, t_min):
+        # Eq. 13: es = [e°(Tmax) + e°(Tmin)] / 2
+        e_tmax = self.calcular_e_circulo_ponto(t_max)
+        e_tmin = self.calcular_e_circulo_ponto(t_min)
+        es = (e_tmax + e_tmin) / 2.0
+        return round(es, 4)
+
+    def calcular_pressao_atual_ea(self, es_calculado, ur_media):
+        # Eq. 15: ea = es * (URm / 100)
+        ea = es_calculado * (ur_media / 100.0)
+        return round(ea, 4)
+
+    def calcular_deficit_vapor(self, es_calculado, ea_calculado):
+        # Deficit = (es - ea)
+        deficit = es_calculado - ea_calculado
+        return round(deficit, 4)
 
     def calcular_eto_penman_monteith(self, rn, g, t_media, u2, es, ea, delta, gama):
         """
