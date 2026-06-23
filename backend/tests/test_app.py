@@ -20,6 +20,9 @@ def client():
     os.close(fd)
     os.remove(path)
 
+def disable_test_sensor_post(client):
+    response = client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})
+    assert response.status_code == 200
 def test_projetos_metadados_criacao(client):
     payload = {"codigo_projeto": "TEST-1", "nome_projeto": "Proj Test", "area_total_irrigada": 10.5}
     response = client.post('/api/projetos', json=payload)

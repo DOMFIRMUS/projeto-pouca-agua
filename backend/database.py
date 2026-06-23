@@ -794,6 +794,19 @@ def get_historico(codigo_projeto=None):
 
 
 
+def obter_projeto_por_codigo(codigo_projeto):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM projetos_metadados WHERE codigo_projeto = ?', (codigo_projeto,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return None
+
+
+
+
 def salvar_dados_area_sombreada(codigo_projeto, tipo_calculo, ss_largura, dco_diametro, ps_calculado):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -803,6 +816,12 @@ def salvar_dados_area_sombreada(codigo_projeto, tipo_calculo, ss_largura, dco_di
         ORDER BY id DESC LIMIT 1
     """, (codigo_projeto,))
 
+def get_projeto_metadados(codigo_projeto):
+    return obter_projeto_por_codigo(codigo_projeto)
+
+def insert_projeto(dados):
+    conn = get_db_connection()
+    cursor = conn.cursor()
     # First, check if the project exists
     cursor.execute('SELECT 1 FROM projetos_metadados WHERE codigo_projeto = ?', (codigo_projeto,))
     row = cursor.fetchone()

@@ -301,6 +301,7 @@ class CalculadorIrrigacao:
         """
         return round(es - ea, 4)
 
+    def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=-22.0):
     def calcular_eto_blaney_criddle(self, t_media, mes_index):
         pass
         pass
@@ -1164,42 +1165,6 @@ class CalculadorIrrigacao:
                 melhor_d = d
 
         return melhor_d
-    def calcular_rn(self, t_max_c, t_min_c, ea, rs, rso, rns):
-        """
-        Calcula a Radiação de Onda Longa (Rnl) e o Saldo de Radiação (Rn)
-        utilizando o balanço de energia do modelo Penman-Monteith.
-        """
-        if rso <= 0:
-            return 0.0, 0.0
-
-        if ea < 0:
-            ea = 0.0
-
-        t_max_k = t_max_c + 273.16
-        t_min_k = t_min_c + 273.16
-        sigma = 4.903e-9
-
-        # Equação 19
-        termo_temperatura = (sigma * (t_max_k ** 4) + sigma * (t_min_k ** 4)) / 2.0
-        termo_umidade = 0.34 - 0.14 * math.sqrt(ea)
-        termo_nebulosidade = 1.35 * (rs / rso) - 0.35
-
-        r_nl = termo_temperatura * termo_umidade * termo_nebulosidade
-
-        # Equação 20
-        r_n = rns - r_nl
-
-        return r_nl, r_n
-    def calcular_rns(self, rs, ra, altitude_m):
-        """
-        Calcula a Radiação Solar de Céu Claro (Rso) e a Radiação Líquida de Onda Curta (Rns).
-        Equação 17: Rso = [0.75 + 2 * (Altitude / 100000)] * Ra
-        Equação 18: Rns = 0.77 * Rs
-        Mantém a unidade: MJ * m^-2 * d^-1
-        """
-        rso = (0.75 + 2 * (altitude_m / 100000)) * ra
-        rns = 0.77 * rs
-        return round(rso, 2), round(rns, 2)
     def calcular_constante_psicrometrica(self, altitude_z):
         """
         Calcula a Pressão Atmosférica (P) e a Constante Psicrométrica (γ)
@@ -1281,6 +1246,38 @@ class CalculadorIrrigacao:
 
         return resultado
 
+    TABELA_STEFAN_BOLTZMANN = { 1.0: 27.70, 1.5: 27.90, 2.0: 28.11, 2.5: 28.31, 3.0: 28.52, 3.5: 28.72, 4.0: 28.93, 4.5: 29.14, 17.0: 34.75, 17.5: 34.99, 18.0: 35.24, 18.5: 35.48, 19.0: 35.72, 19.5: 35.97, 20.0: 36.21, 20.5: 36.46, 33.0: 43.08, 33.5: 43.36, 34.0: 43.64, 34.5: 43.93, 35.0: 44.21, 35.5: 44.50, 36.0: 44.79, 36.5: 45.08 }
+
+    def obter_stefan_boltzmann(self, t_celsius):
+        t = float(t_celsius)
+        chaves = sorted(self.TABELA_STEFAN_BOLTZMANN.keys())
+        if t <= chaves[0]: return self.TABELA_STEFAN_BOLTZMANN[chaves[0]]
+        if t >= chaves[-1]: return self.TABELA_STEFAN_BOLTZMANN[chaves[-1]]
+        for i in range(len(chaves) - 1):
+            if chaves[i] <= t <= chaves[i+1]:
+                x0, y0 = chaves[i], self.TABELA_STEFAN_BOLTZMANN[chaves[i]]
+                x1, y1 = chaves[i+1], self.TABELA_STEFAN_BOLTZMANN[chaves[i+1]]
+                return y0 + (y1 - y0) * (t - x0) / (x1 - x0)
+        return 0.0
+
+    def calcular_rso(self, altitude, ra):
+        return (0.75 + 2 * (altitude / 100000.0)) * ra
+
+    def calcular_rns(self, rs):
+        return 0.77 * rs
+
+    def calcular_rnl(self, t_max, t_min, ea, rs, rso):
+        import math
+        stefan_max = self.obter_stefan_boltzmann(t_max)
+        stefan_min = self.obter_stefan_boltzmann(t_min)
+        termo_temperatura = (stefan_max + stefan_min) / 2.0
+        termo_umidade = 0.34 - 0.14 * math.sqrt(max(0, ea))
+        razao = 1.0 if rso <= 0.0 else (rs / rso)
+        termo_nebulosidade = 1.35 * razao - 0.35
+        return termo_temperatura * termo_umidade * termo_nebulosidade
+
+    def calcular_rn(self, rns, rnl):
+        return rns - rnl
     def calcular_diametro_dw_schwartzman(self, z_profundidade, q_vazao, ko_condutividade):
         """
         Equação 25 (Diâmetro Máximo Molhado - Dw)
