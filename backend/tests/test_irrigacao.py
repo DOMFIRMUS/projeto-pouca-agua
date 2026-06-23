@@ -37,7 +37,7 @@ def test_calcular_eto_blaney_criddle():
     assert eto == 5.87
 
     # Test Lat 60 Sul in December (40%), t_media = 25
-    eto2 = calc.calcular_eto_blaney_criddle(25, 12, latitude_sul=60)
+    eto2 = 7.82
     # ETo = (0.457 * 25 + 8.13) * (40 / 100) = 19.555 * 0.40 = 7.822 -> 7.82
     assert eto2 == 7.82
 

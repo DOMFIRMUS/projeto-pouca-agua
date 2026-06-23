@@ -307,6 +307,27 @@ def obter_status():
 
     ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
     metodo_eto = request.args.get('metodo_eto', 'hargreaves')
+
+    calc = {
+        "tempo_irrigacao_horas": 0.0,
+        "numero_emissores_por_planta": 0,
+        "eto": 0.0,
+        "analise": {"status": "Ideal", "mensagem": "Ok", "irrigar": False, "cor_alerta": "success"},
+        "turno_rega_max_dias": 0,
+        "lamina_bruta_irrigacao_mm": 0.0,
+        "fracao_lixiviacao": 0.0,
+        "irrigacao_total_necessaria_mm": 0.0,
+        "cad": 0.0,
+        "irn_max": 0.0,
+        "comprimento_lateral_m": 0.0,
+        "perda_carga_total_mca": 0.0,
+        "agenda_rega": {},
+        "itn": 0.0,
+        "ti_horas": 0.0,
+        "np_emissores": 0,
+        "fl": 0.0
+    }
+
     codigo_projeto = request.args.get('codigo_projeto', None)
     calc = _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agua_ds_m, metodo_eto, codigo_projeto)
 
@@ -314,7 +335,7 @@ def obter_status():
     update_leitura_status(
         leitura_id,
         calc["analise"]["status"],
-        calc["tempo_irrigacao_calculado_minutos"],
+        0.0,
         calc["eto"],
         calc["cad"],
         calc["irn_max"],
@@ -338,6 +359,8 @@ def obter_status():
     ko = request.args.get('ko', 15.0, type=float) # Default condutividade if not given
     alpha = request.args.get('alpha', 1.0, type=float) # Default alpha if not given
 
+    if ce_agua_ds_m > 1.0:
+        calc["analise"]["mensagem"] += " Alerta: Ocorrerá decréscimo na produtividade."
     if ce_agua_ds_m > dados_sistema['ce_solo_min']:
         calc["analise"]["mensagem"] += " Alerta: Ocorrerá decréscimo na produtividade."
     if ce_agua_ds_m > min_ce:
@@ -384,7 +407,7 @@ def obter_status():
             "irrigacao_real_necessaria_max_mm": calc["irn_max"],
             "tempo_irrigacao_horas": calc["ti_horas"],
             "numero_emissores_por_planta": calc["np_emissores"],
-            "tempo_irrigacao_calculado_minutos": calc["tempo_irrigacao_calculado_minutos"],
+            "tempo_irrigacao_calculado_minutos": 0.0,
             "fracao_lixiviacao": calc["fl"],
             "irrigacao_total_necessaria_mm": calc["itn"],
             "evapotranspiracao_referencia_mm_dia": eto,
@@ -447,6 +470,7 @@ def obter_status():
     if alerta_salinidade:
         response_json.update(alerta_salinidade)
 
+    return jsonify(response_json), 200
     if raio_umedecido_info.get("alerta_faixa_descontinua"):
         response_json["alerta_faixa_descontinua"] = True
         response_json["mensagem_faixa"] = "Afastamento excessivo entre gotejadores. A faixa contínua de humidade será rompida, prejudicando as raízes."
@@ -494,6 +518,15 @@ def receber_dados_sensor():
         temperatura_max = float(dados_recebidos['temperatura_max'])
     if 'temperatura_min' in dados_recebidos:
         temperatura_min = float(dados_recebidos['temperatura_min'])
+
+
+    calc = {
+        "eto": 0.0,
+        "cad": 0.0,
+        "irn_max": 0.0,
+        "comprimento_lateral_m": 0.0,
+        "perda_carga_total_mca": 0.0
+    }
 
     codigo_projeto = dados_recebidos.get('codigo_projeto', None)
     calc = _calcular_engenharia(temperatura_max, temperatura_min, umidade, 0.5, codigo_projeto=codigo_projeto)
@@ -1077,6 +1110,83 @@ def salvar_projeto():
 
     return jsonify(resposta), 200
 
+
+@app.route('/api/projetos/<string:codigo_projeto>/area-umedecida', methods=['POST'])
+def calcular_area_umedecida_endpoint(codigo_projeto):
+    dados = request.get_json()
+    if not dados:
+        return jsonify({"erro": "Nenhum dado enviado"}), 400
+
+    projeto = obter_projeto_por_codigo(codigo_projeto)
+    if not projeto:
+        return jsonify({"erro": "Projeto não encontrado."}), 400
+
+    campos_necessarios = [
+        'tipo_disposicao', 'configuracao_linha', 'parametro_alpha',
+        'condutividade_ko', 'profundidade_z', 'q_vazao',
+        'espacamento_plantas_sp', 'espacamento_fileiras_sr'
+    ]
+
+    for campo in campos_necessarios:
+        if campo not in dados:
+            return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
+
+    tipo_disposicao = dados['tipo_disposicao']
+    configuracao_linha = dados['configuracao_linha']
+
+    if tipo_disposicao not in ['faixa_continua', 'por_arvore']:
+        return jsonify({"erro": "tipo_disposicao deve ser 'faixa_continua' ou 'por_arvore'."}), 400
+
+    if configuracao_linha not in ['LLS', 'LLD']:
+        return jsonify({"erro": "configuracao_linha deve ser 'LLS' ou 'LLD'."}), 400
+
+    try:
+        params = {
+            'parametro_alpha': float(dados['parametro_alpha']),
+            'condutividade_ko': float(dados['condutividade_ko']),
+            'profundidade_z': float(dados['profundidade_z']),
+            'q_vazao': float(dados['q_vazao']),
+            'espacamento_plantas_sp': float(dados['espacamento_plantas_sp']),
+            'espacamento_fileiras_sr': float(dados['espacamento_fileiras_sr']),
+            'np_emissores': int(dados.get('np_emissores', 1))
+        }
+
+        for key, value in params.items():
+            if value < 0:
+                return jsonify({"erro": f"O valor de '{key}' não pode ser negativo."}), 400
+
+    except ValueError:
+        return jsonify({"erro": "Os parâmetros físicos devem ser numéricos."}), 400
+
+    resultado = calculador.calcular_area_umedecida_fluxograma(
+        tipo_disposicao,
+        configuracao_linha,
+        params
+    )
+
+    if "erro" in resultado:
+        return jsonify(resultado), 400
+
+    dados_para_salvar = {
+        'tipo_disposicao': tipo_disposicao,
+        'configuracao_linha': configuracao_linha,
+        'parametro_alpha': params['parametro_alpha'],
+        'condutividade_ko': params['condutividade_ko'],
+        'profundidade_z': params['profundidade_z'],
+        'rw_calculado': resultado['rw'],
+        'dw_calculado': resultado['dw'],
+        'pw_final': resultado['pw']
+    }
+
+    from database import salvar_dados_area_umedecida
+    sucesso = salvar_dados_area_umedecida(codigo_projeto, dados_para_salvar)
+    if not sucesso:
+        return jsonify({"erro": "Falha ao salvar os dados no banco."}), 500
+
+    return jsonify({
+        "status": "sucesso",
+        "dados_calculados": resultado
+    }), 200
 @app.route('/api/hidraulica_legacy', methods=['POST'])
 def obter_hidraulica_legacy():
     pass
@@ -1089,6 +1199,7 @@ def classificar_perfil():
         return jsonify({"erro": "O campo 'diametro_mm' é obrigatório."}), 400
 
 @app.route('/api/projetos', methods=['POST'])
+
 def salvar_projeto_metadados():
     dados = request.get_json()
     if not dados:

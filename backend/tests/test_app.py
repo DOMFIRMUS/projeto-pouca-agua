@@ -162,6 +162,7 @@ def test_hidraulica_post_invalid_type(client):
     assert response.status_code == 400
     data = json.loads(response.data)
     assert 'erro' in data
+    assert "Todos os parâmetros básicos devem ser números válidos." in data['erro']
     assert "Todos os parâmetros devem ser números válidos." in data['erro']
 
 def test_hidraulica_post_success_basic(client):
