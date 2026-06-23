@@ -1261,6 +1261,50 @@ class CalculadorIrrigacao:
 
         return resultado
 
+
+    def orquestrar_etc_figura_8(self, modelo, eto, kc, pw_valor, ps_valor):
+        p_percent = max(float(pw_valor), float(ps_valor))
+        p_decimal = p_percent / 100.0
+
+        if modelo == 'fereres_1981':
+            if p_decimal <= 0.20:
+                kl = 1.94 * p_decimal + 0.10
+            elif p_decimal < 0.65:
+                kl = 1.09 * p_decimal + 0.30
+            else:
+                kl = 1.0
+        else:
+            kl = p_decimal
+
+        kl_final = max(0.0, min(1.0, kl))
+        etc = float(eto) * float(kc) * kl_final
+        return round(etc, 3)
+
+    def calcular_cad_solo(self, theta_cc, theta_pmp, profundidade_z):
+        if float(theta_cc) <= float(theta_pmp) or float(profundidade_z) <= 0:
+            return 0.0
+        cad = (float(theta_cc) - float(theta_pmp)) * float(profundidade_z) * 1000.0
+        return round(cad, 2)
+
+    def calcular_irn_e_turno_rega(self, cad, fator_f, etc, precipitacao_efetiva=0.0):
+        raw = float(cad) * float(fator_f)
+
+        if float(etc) <= 0:
+            turno_rega = 1
+        else:
+            turno_rega = math.floor(raw / float(etc))
+            if turno_rega < 1:
+                turno_rega = 1
+
+        irn = float(etc) - float(precipitacao_efetiva)
+        if irn < 0:
+            irn = 0.0
+
+        return {
+            "cad": round(float(cad), 2),
+            "raw": round(raw, 2),
+            "turno_rega": int(turno_rega),
+            "irn": round(irn, 2)
     TABELA_STEFAN_BOLTZMANN = { 1.0: 27.70, 1.5: 27.90, 2.0: 28.11, 2.5: 28.31, 3.0: 28.52, 3.5: 28.72, 4.0: 28.93, 4.5: 29.14, 17.0: 34.75, 17.5: 34.99, 18.0: 35.24, 18.5: 35.48, 19.0: 35.72, 19.5: 35.97, 20.0: 36.21, 20.5: 36.46, 33.0: 43.08, 33.5: 43.36, 34.0: 43.64, 34.5: 43.93, 35.0: 44.21, 35.5: 44.50, 36.0: 44.79, 36.5: 45.08 }
 
     def obter_stefan_boltzmann(self, t_celsius):
