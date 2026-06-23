@@ -1,28 +1,12 @@
+# -*- coding: utf-8 -*-
 import math
 # backend/app.py
 import os
 import sqlite3
 import json
 from flask import Flask, jsonify, request
-from flask_cors import CORS
-from backend.models.irrigacao import CalculadorIrrigacao
-import datetime
-from backend.database import obter_projeto_por_codigo, obter_resumo_hidraulico, init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_projeto_metadados, insert_projeto
-from backend.database import init_db, obter_projeto_por_codigo, obter_resumo_hidraulico, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_bancos, insert_banco, delete_banco
-from backend.database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, insert_projeto
-
-from backend.database import (
-    get_db_connection,
-    insert_projeto,
-    get_projeto_metadados,
-    vincular_cultura_projeto,
-    update_area_umedecida_projeto,
-    update_area_sombreada_projeto,
-    get_culturas,
-    insert_leitura,
-    get_ultima_leitura,
-    get_historico
-)
+import sqlite3
+from backend.database import init_db, salvar_dados_solo_p58
 from backend.models.irrigacao import CalculadorIrrigacao
 from models.irrigacao import CalculadorIrrigacao
 import datetime
@@ -35,38 +19,6 @@ from database import init_db, obter_projeto_por_codigo, obter_resumo_hidraulico,
 from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, insert_projeto
 
 app = Flask(__name__)
-CORS(app)
-
-calculador = CalculadorIrrigacao()
-
-@app.route('/api/projetos', methods=['POST'])
-def criar_projeto():
-    """
-    Rotina 3.1 - Metadados Gerais
-    """
-    dados = request.get_json()
-    if not dados or 'codigo_projeto' not in dados:
-        return jsonify({"erro": "O campo 'codigo_projeto' é obrigatório."}), 400
-
-    try:
-        resultado = insert_projeto(
-            codigo_projeto=str(dados['codigo_projeto']),
-            nome_projeto=str(dados.get('nome_projeto', '')),
-            nome_propriedade=str(dados.get('nome_propriedade', '')),
-            nome_proprietario=str(dados.get('nome_proprietario', '')),
-            nome_projetista=str(dados.get('nome_projetista', '')),
-            identificacao=str(dados.get('identificacao', '')),
-            nome_codigo_subunidade=str(dados.get('nome_codigo_subunidade', '')),
-            area_total_irrigada=float(dados.get('area_total_irrigada', 0.0)),
-            area_subunidade=float(dados.get('area_subunidade', 0.0)),
-            data_elaboracao=str(dados.get('data_elaboracao', ''))
-        )
-        if resultado["status"] == "erro":
-            return jsonify(resultado), 400
-        return jsonify(resultado), 201
-    except ValueError:
-        return jsonify({"erro": "Tipos de dados invalidos"}), 400
-# Inicializa o banco de dados
 init_db()
 seed_culturas()
 
@@ -1017,136 +969,55 @@ def calcular_area_umedecida_endpoint(codigo_projeto):
     if not dados:
         return jsonify({"erro": "Nenhum dado enviado"}), 400
 
-    # Determina qual lógica usar com base nos campos presentes
-    if 'So' in dados or 'k_linha' in dados or 'L_estimado' in dados:
-        if 'So' not in dados or 'k_linha' not in dados or 'L_estimado' not in dados:
-            return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
-        try:
-            So = float(dados['So'])
-            k_linha = float(dados['k_linha'])
-            L_estimado = float(dados['L_estimado'])
-        except ValueError:
-            return jsonify({"erro": "Os valores de 'So', 'k_linha' e 'L_estimado' devem ser numéricos."}), 400
+def obter_conexao():
+    conn = sqlite3.connect("irrigacao.db")
+    conn.row_factory = sqlite3.Row
+    return conn
 
-        # Mapeamento alterado devido ao mock que foi inserido anteriormente
-        if hasattr(calculador, 'classificar_perfil_topografico'):
-             classificacao = calculador.classificar_perfil_topografico(So, k_linha, L_estimado)
-        else:
-             classificacao = calculador.classificar_perfil_pressao(So, k_linha, L_estimado)
-             classificacao = {"classificacao": classificacao}
+@app.route("/")
+def home():
+    return jsonify({"status": "Plataforma de Irrigacao Familar Ativa"}), 200
 
-        return jsonify(classificacao), 200
-    else:
-        campos_obrigatorios = ['diametro_mm', 'vazao_gotejador_lh', 'espacamento_m', 'comprimento_m']
-
-        for campo in campos_obrigatorios:
-            if campo not in dados:
-                return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
-
-        try:
-            diametro_mm = float(dados['diametro_mm'])
-            vazao_gotejador_lh = float(dados['vazao_gotejador_lh'])
-            espacamento_m = float(dados['espacamento_m'])
-            comprimento_m = float(dados['comprimento_m'])
-        except ValueError:
-            return jsonify({"erro": "Todos os parâmetros devem ser números válidos."}), 400
-
-        resultado = calculador.calcular_perda_carga(
-            diametro_mm,
-            vazao_gotejador_lh,
-            espacamento_m,
-            comprimento_m
-        )
-
-        if "erro" in resultado:
-            return jsonify(resultado), 400
-
-        return jsonify(resultado), 200
-    if not dados:
-        return jsonify({"erro": "Payload invalido"}), 400
-
-    projeto = get_projeto_metadados(codigo_projeto)
-    if not projeto:
-        return jsonify({"erro": "Projeto inexistente. Configure os metadados primeiro."}), 404
-
+@app.route("/api/projetos/<string:codigo_projeto>/irn", methods=["POST"])
+def calcular_irn_projeto_p58(codigo_projeto):
     try:
-        q_vazao = float(dados.get('q_vazao', 2.0))
-        volume_z = float(dados.get('volume_z', 30.0))
-        ko_condutividade = float(dados.get('ko_condutividade', 15.0))
-        espacamento_plantas_sp = float(dados.get('espacamento_plantas_sp', 0.5))
-        espacamento_fileiras_sr = float(dados.get('espacamento_fileiras_sr', 1.0))
-        numero_emissores_np = int(dados.get('numero_emissores_np', 1))
+        payload = request.get_json() or {}
+        cc = payload.get("theta_cc")
+        pmp = payload.get("theta_pmp")
+        fator_f = payload.get("fator_f")
+        pe = payload.get("pe", 0.0)
+        tipo = payload.get("tipo_irrigacao", "total")
 
-        # This calls the method from the model
-        resultado = calculador.calcular_area_umedecida(
-            q_vazao, volume_z, ko_condutividade, espacamento_plantas_sp, espacamento_fileiras_sr, numero_emissores_np
-        )
+        if cc is None or pmp is None or fator_f is None or float(cc) < 0 or float(pmp) < 0 or float(fator_f) < 0:
+            return jsonify({"erro": "Dados de entrada invalidos ou negativos"}), 400
 
-        update_area_umedecida_projeto(
-            codigo_projeto,
-            0.0, # rw was removed
-            resultado[0], # dw
-            resultado[1], # pw
-            str(dados.get('tipo_disposicao', '')),
-            str(dados.get('configuracao_linha', '')),
-            float(dados.get('parametro_alpha', 1.0)),
-            ko_condutividade,
-            volume_z
-        )
+        conn = obter_conexao()
+        cursor = conn.cursor()
+        cursor.execute("SELECT profundidade_z FROM projetos_metadados WHERE codigo_projeto = ?", (codigo_projeto,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if row is None:
+            return jsonify({"erro": "Projeto nao encontrado"}), 404
+
+        z = row[0] if row[0] is not None else 0.40 # Fallback seguro de engenharia
+
+        calculador = CalculadorIrrigacao()
+        cad = calculador.calcular_cad(cc, pmp, z)
+        irn = calculador.calcular_irn_p58(cad, fator_f, pe, tipo)
+
+        salvar_dados_solo_p58(codigo_projeto, fator_f, pe, tipo, cad, irn)
 
         return jsonify({
-            "status": "sucesso",
-            "metadados": resultado
-        }), 200
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 400
-    if not has_advanced and not has_basic:
-        if any(key in dados for key in ['So', 'k_linha', 'L_estimado']):
-             return jsonify({"erro": "Os campos 'So', 'k_linha' e 'L_estimado' são obrigatórios."}), 400
-        return jsonify({"erro": "Faltam parâmetros básicos (diametro_mm, etc) ou avançados (So, k_linha, etc)."}), 400
-
-
-@app.route('/api/projetos/<string:codigo_projeto>/area-sombreada', methods=['POST'])
-def calcular_area_sombreada_endpoint(codigo_projeto):
-    """
-    Rotina 5 - Ps (Area Sombreada)
-    """
-    dados = request.get_json()
-    if not dados:
-        return jsonify({"erro": "Payload invalido"}), 400
-
-    projeto = get_projeto_metadados(codigo_projeto)
-    if not projeto:
-        return jsonify({"erro": "Projeto inexistente. Configure os metadados primeiro."}), 404
-
-    try:
-        tipo_copa = str(dados.get('tipo_copa', 'circular'))
-        espacamento_plantas_sp = float(dados.get('espacamento_plantas_sp', 1.0))
-        espacamento_fileiras_sr = float(dados.get('espacamento_fileiras_sr', 1.0))
-        largura_faixa_ss = dados.get('largura_faixa_ss', None)
-        diametro_copa_dco = dados.get('diametro_copa_dco', None)
-
-        if largura_faixa_ss is not None: largura_faixa_ss = float(largura_faixa_ss)
-        if diametro_copa_dco is not None: diametro_copa_dco = float(diametro_copa_dco)
-
-        ps = calculador.calcular_area_sombreada(
-            tipo_copa, espacamento_plantas_sp, espacamento_fileiras_sr, largura_faixa_ss, diametro_copa_dco
-        )
-
-        update_area_sombreada_projeto(
-            codigo_projeto,
-            ps,
-            tipo_copa,
-            largura_faixa_ss if largura_faixa_ss else 0.0,
-            diametro_copa_dco if diametro_copa_dco else 0.0
-        )
-        return jsonify({
-            "status": "sucesso",
-            "ps": ps
+            "codigo_projeto": codigo_projeto,
+            "cad_calculada": cad,
+            "irn_calculada": irn
         }), 200
     except Exception as e:
         return jsonify({"erro": str(e)}), 400
 
+if __name__ == "__main__":
+    app.run(debug=True, port=5000)
 
 @app.route('/api/hidraulica', methods=['POST'])
 def leitura_climatica():

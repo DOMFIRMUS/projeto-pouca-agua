@@ -1,7 +1,9 @@
+# -*- coding: utf-8 -*-
 import math
-import datetime
 
 class CalculadorIrrigacao:
+    def calcular_cad(self, theta_cc, theta_pmp, z):
+        if float(theta_cc) < float(theta_pmp) or float(z) <= 0:
 
     def obter_duracao_maxima_n(self, latitude_sul, mes_index):
         if mes_index < 1 or mes_index > 12:
@@ -789,7 +791,20 @@ class CalculadorIrrigacao:
         """
         if espacamento_fileiras_sr <= 0:
             return 0.0
+        cad = 1000.0 * (float(theta_cc) - float(theta_pmp)) * float(z)
+        return round(cad, 2)
 
+    def calcular_irn_p58(self, cad, fator_f, pe=0.0, tipo_irrigacao='total'):
+        if tipo_irrigacao == 'total':
+            irn = float(cad) * float(fator_f)
+        elif tipo_irrigacao == 'suplementar':
+            irn = (float(cad) * float(fator_f)) - float(pe)
+        else:
+            irn = 0.0
+
+        if irn < 0.0:
+            irn = 0.0
+        return round(irn, 2)
         tipo_copa = tipo_copa.lower()
 
         if tipo_copa == 'faixa_continua':

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sqlite3
 from flask import current_app
 import os
@@ -12,9 +13,13 @@ def get_db_connection():
     return conn
 
 def init_db():
-    conn = get_db_connection()
+    conn = sqlite3.connect("irrigacao.db")
     cursor = conn.cursor()
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS projetos_metadados (
+            codigo_projeto TEXT PRIMARY KEY,
+            nome TEXT,
+            cultura TEXT,
                 CREATE TABLE IF NOT EXISTS historico_leitura (
 
     cursor.execute("""
@@ -160,21 +165,11 @@ def init_db():
             parametro_alpha REAL,
             condutividade_ko REAL,
             profundidade_z REAL,
-            tipo_calculo TEXT,
-            ss_largura_faixa REAL,
-            dco_diametro_copa REAL,
-            rw_raio_umedecido REAL,
-            dw_diametro_molhado REAL,
-            pw_area_umedecida REAL,
-            ps_area_sombreada REAL,
-            FOREIGN KEY (cultura_id) REFERENCES culturas (id)
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS bancos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            taxa_mensal REAL NOT NULL
+            fator_f REAL,
+            precipitacao_efetiva REAL,
+            tipo_irrigacao TEXT,
+            cad_calculado REAL,
+            irn_calculada REAL
         )
     """)
     cursor.execute("""
@@ -212,6 +207,7 @@ def init_db():
     conn.commit()
     conn.close()
 
+def salvar_dados_solo_p58(codigo, f, pe, tipo, cad, irn):
 def vincular_cultura_projeto(codigo_projeto, cultura_id, estagio_selecionado):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -280,6 +276,8 @@ def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, prof
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        conn = sqlite3.connect("irrigacao.db")
+        cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO projetos_metadados (codigo_projeto, nome_projeto, largura, altura, profundidade)
             VALUES (?, ?, ?, ?, ?)
@@ -833,18 +831,10 @@ def insert_projeto(dados):
     try:
         cursor.execute('''
             UPDATE projetos_metadados
-            SET tipo_calculo_ps = ?,
-                ss_largura_faixa = ?,
-                dco_diametro_copa = ?,
-                ps_calculado = ?
+            SET fator_f = ?, precipitacao_efetiva = ?, tipo_irrigacao = ?, cad_calculado = ?, irn_calculada = ?
             WHERE codigo_projeto = ?
-        ''', (tipo_calculo, ss_largura, dco_diametro, ps_calculado, codigo_projeto))
+        """, (f, pe, tipo, cad, irn, codigo))
         conn.commit()
-        return True
-    except sqlite3.Error as e:
-        print(f"Database error in salvar_dados_area_sombreada: {e}")
-        return False
-    finally:
         conn.close()
 
 
@@ -927,7 +917,10 @@ def insert_projeto(dados):
         ))
         conn.commit()
         return True
-    except sqlite3.IntegrityError:
+    except:
         return False
-    finally:
-        conn.close()
+
+def get_db_connection():
+    conn = sqlite3.connect("irrigacao.db")
+    conn.row_factory = sqlite3.Row
+    return conn
