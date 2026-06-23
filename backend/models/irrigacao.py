@@ -74,6 +74,76 @@ class CalculadorIrrigacao:
         0:  [12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0]
     }
 
+    # Complemento obrigatório da Tabela 5
+    DADOS_STEFAN_BOLTZMANN_P52 = {
+        5.0: 29.35,  6.0: 29.78,  6.5: 29.99,  7.0: 30.21,  7.5: 30.42,  8.0: 30.64,  8.5: 30.86,  9.0: 31.08,  9.5: 31.30,  10.0: 31.52, 10.5: 31.74, 11.0: 31.97, 11.5: 32.19, 12.0: 32.42, 12.5: 32.65, 13.0: 32.88, 13.5: 33.11, 14.0: 33.34, 14.5: 33.57, 15.0: 33.81, 15.5: 34.04, 16.0: 34.28, 16.5: 34.52,
+        21.0: 36.71, 22.0: 37.21, 22.5: 37.47, 23.0: 37.72, 23.5: 37.98, 24.0: 38.23, 24.5: 38.49, 25.0: 38.75, 25.5: 39.01, 26.0: 39.27, 26.5: 39.53, 27.0: 39.80, 27.5: 40.06, 28.0: 40.33, 28.5: 40.60, 29.0: 40.87, 29.5: 41.14, 30.0: 41.41, 30.5: 41.69, 31.0: 41.96, 31.5: 42.24, 32.0: 42.52, 32.5: 42.80,
+        37.0: 45.37, 38.0: 45.96, 38.5: 46.26, 39.0: 46.56, 39.5: 46.85, 40.0: 47.15, 40.5: 47.46, 41.0: 47.76, 41.5: 48.06, 42.0: 48.37, 42.5: 48.68, 43.0: 48.99, 43.5: 49.30, 44.0: 49.61, 44.5: 49.92, 45.0: 50.24, 45.5: 50.56, 46.0: 50.87, 46.5: 51.19, 47.0: 51.51, 47.5: 51.84, 48.0: 52.16, 48.5: 52.49
+    }
+
+    def obter_stefan_boltzmann(self, t_media):
+        """
+        Interpolação linear contínua para a Tabela 5.
+        """
+        # Trata limites absolutos se t_media for menor que o menor ou maior que o maior da tabela
+        keys = sorted(list(self.DADOS_STEFAN_BOLTZMANN_P52.keys()))
+        if t_media <= keys[0]:
+            return self.DADOS_STEFAN_BOLTZMANN_P52[keys[0]]
+        if t_media >= keys[-1]:
+            return self.DADOS_STEFAN_BOLTZMANN_P52[keys[-1]]
+
+        # Encontra os vizinhos mais próximos
+        menor = keys[0]
+        maior = keys[-1]
+        for k in keys:
+            if k <= t_media:
+                menor = k
+            if k > t_media:
+                maior = k
+                break
+
+        if menor == maior:
+            return self.DADOS_STEFAN_BOLTZMANN_P52[menor]
+
+        v_menor = self.DADOS_STEFAN_BOLTZMANN_P52[menor]
+        v_maior = self.DADOS_STEFAN_BOLTZMANN_P52[maior]
+
+        interpolado = v_menor + (v_maior - v_menor) * (t_media - menor) / (maior - menor)
+        return round(interpolado, 2)
+
+    def calcular_declividade_delta(self, t_media):
+        """
+        Equação 21: Declividade da curva de pressão de vapor (Delta)
+        """
+        denominador = t_media + 237.3
+        if denominador == 0:
+            return 0.0
+
+        exp_term = math.exp((17.27 * t_media) / denominador)
+        numerador = 4098 * (0.6108 * exp_term)
+        delta = numerador / (denominador ** 2)
+        return round(delta, 4)
+
+    def calcular_pressao_atmosferica_p(self, altitude_z):
+        """
+        Equação 22: Pressão Atmosférica baseada na altitude (P)
+        """
+        term = 293 - 0.0065 * altitude_z
+        if term < 0:
+            term = 0.0
+
+        p = 101.3 * ((term / 293) ** 5.26)
+        return round(p, 2)
+    def definir_kc_por_estagio(self, kc_inicial, kc_media, kc_final, estagio):
+        if estagio == 'inicial':
+            return kc_inicial
+        elif estagio == 'meia_estacao':
+            return kc_media
+        elif estagio == 'final':
+            return kc_final
+        else:
+            return kc_media
+
     def __init__(self):
         # Parâmetros agronómicos padrão (Ex: Tomate / Cana-de-açúcar)
         self.umidade_critica = 40.0
@@ -212,6 +282,9 @@ class CalculadorIrrigacao:
 
         return self.tabela_ra[lat_par][mes_index - 1]
 
+    def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
+        pass # stub
+
     def calcular_pressao_atual_ea(self, es, umidade_relativa_media_ur):
         """
         Calcula a Pressão Atual de Vapor (ea) em kPa.
@@ -228,7 +301,6 @@ class CalculadorIrrigacao:
 
     def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
         """
-        Calcula a Evapotranspiração de Referência (ETo em mm/dia) usando o método de Blaney-Criddle-FAO.
         Baseado na Tabela 3 - Percentagem diária de horas anuais de luz solar (P) para Latitude Sul.
         """
         # Tabela 3 - Percentagem diária de horas anuais de luz solar (Latitudes Sul)
@@ -741,6 +813,69 @@ class CalculadorIrrigacao:
             condicao = So / (k_linha * (L ** 1.75))
             if not (0 < condicao < 1):
                 raise ValueError(f"Condição da Equação 59 não satisfeita (deve estar entre 0 e 1): {condicao}")
+            razao = So / (k_linha * (L_atual ** 1.75))
+            if razao < 2.75:
+                raise ValueError(f"Restrição de limite físico não atendida (Equação 66): S0 / (k' * L^1.75) = {razao:.4f} < 2.75. O ganho por desnível não supera totalmente a perda por atrito em todas as seções.")
+
+            L_novo = (H * Hvar) / ((So - k_linha * (L_atual ** 1.75)) * (1 - Hvar))
+
+            if abs(L_novo - L_atual) < 0.001:
+                return L_novo
+
+            L_atual = L_novo
+            iteracoes += 1
+
+        raise ValueError("A iteração para calcular L não convergiu após 1000 passos.")
+
+    def calcular_porcentagem_area_sombreada_ps(self, tipo_calculo, params):
+        if tipo_calculo not in ['faixa_sombreada', 'diametro_copa']:
+            raise ValueError('Método de cálculo de área sombreada inválido ou dados insuficientes.')
+
+        ps = 0.0
+
+        if tipo_calculo == 'faixa_sombreada':
+            ss_largura = params.get('ss_largura')
+            sr_espacamento = params.get('sr_espacamento')
+
+            if ss_largura is None or sr_espacamento is None:
+                raise ValueError('Método de cálculo de área sombreada inválido ou dados insuficientes.')
+
+            if sr_espacamento <= 0:
+                return 0.0
+
+            # Equação 28
+            ps = (ss_largura / sr_espacamento) * 100.0
+
+        elif tipo_calculo == 'diametro_copa':
+            dco_diametro = params.get('dco_diametro')
+            sr_espacamento = params.get('sr_espacamento')
+            sp_espacamento = params.get('sp_espacamento')
+
+            if dco_diametro is None or sr_espacamento is None or sp_espacamento is None:
+                raise ValueError('Método de cálculo de área sombreada inválido ou dados insuficientes.')
+
+            if sr_espacamento <= 0 or sp_espacamento <= 0:
+                return 0.0
+
+            # Equação 29
+            area_copa = math.pi * ((dco_diametro ** 2) / 4.0)
+            area_plantio = sr_espacamento * sp_espacamento
+            ps = (area_copa / area_plantio) * 100.0
+
+        # Normalização limitando o teto matemático a 100.0 e arredondando para 2 casas
+        ps = min(ps, 100.0)
+        return round(ps, 2)
+    def calcular_lmax_perfil_tipo_IIa(self, H, Hvar, So, k_linha, chute_inicial=50.0):
+        L = chute_inicial
+        iteracoes = 0
+        while iteracoes < 1000:
+            iteracoes += 1
+
+    def _calcular_condicao_59(self, So, k_linha, L):
+        # Condição da Equação 59
+        condicao = So / (k_linha * (L ** 1.75))
+        if not (0 < condicao < 1):
+            raise ValueError(f"Condição da Equação 59 não satisfeita (deve estar entre 0 e 1): {condicao}")
 
             razao_lL = 1 - 0.56098 * (condicao ** 0.57143)
             numerador = H * Hvar
