@@ -1,5 +1,5 @@
 import math
-from models.irrigacao import CalculadorIrrigacao
+from backend.models.irrigacao import CalculadorIrrigacao
 
 def test_calcular_pressao_atual_ea():
     calc = CalculadorIrrigacao()
