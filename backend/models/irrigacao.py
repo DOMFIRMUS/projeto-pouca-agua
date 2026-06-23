@@ -3,6 +3,137 @@ import datetime
 
 class CalculadorIrrigacao:
 
+    def obter_duracao_maxima_n(self, latitude_sul, mes_index):
+        if mes_index < 1 or mes_index > 12:
+            mes_index = 1
+        lat_abs = abs(latitude_sul)
+        if lat_abs >= 70:
+            return self.MATRIZ_N_MAX_SUL[70][int(mes_index) - 1]
+        if lat_abs <= 0:
+            return self.MATRIZ_N_MAX_SUL[0][int(mes_index) - 1]
+
+        lat_lower = int(lat_abs // 2) * 2
+        lat_upper = lat_lower + 2
+
+        if lat_lower == lat_abs:
+            return self.MATRIZ_N_MAX_SUL[lat_lower][int(mes_index) - 1]
+
+        n_lower = self.MATRIZ_N_MAX_SUL[lat_lower][int(mes_index) - 1]
+        n_upper = self.MATRIZ_N_MAX_SUL[lat_upper][int(mes_index) - 1]
+
+        fracao = (lat_abs - lat_lower) / 2.0
+        n_interp = n_lower + fracao * (n_upper - n_lower)
+        return n_interp
+
+    def calcular_radiacao_solar_rs(self, ra_calculado, n_insolacao, N_maximo):
+        if N_maximo <= 0:
+            razao_nN = 0.0
+        else:
+            razao_nN = n_insolacao / N_maximo
+
+        rs = (0.25 + 0.50 * razao_nN) * ra_calculado
+        return round(rs, 3)
+
+
+    MATRIZ_N_MAX_SUL = {
+        70: [24.0, 17.4, 13.0, 8.4, 2.7, 0.0, 0.0, 6.4, 11.2, 15.7, 21.7, 24.0],
+        68: [21.9, 16.7, 12.9, 8.7, 4.3, 0.0, 1.7, 7.0, 11.3, 15.3, 19.9, 24.0],
+        66: [20.1, 16.2, 12.8, 9.1, 5.3, 2.0, 3.7, 7.6, 11.3, 15.0, 18.8, 22.1],
+        64: [19.0, 15.8, 12.8, 9.3, 6.1, 3.7, 4.8, 8.0, 11.4, 14.7, 18.0, 20.3],
+        62: [18.3, 15.5, 12.7, 9.6, 6.7, 4.8, 5.6, 8.3, 11.4, 14.5, 17.4, 19.2],
+        60: [17.6, 15.2, 12.6, 9.8, 7.2, 5.6, 6.3, 8.7, 11.5, 14.3, 16.9, 18.4],
+        58: [17.1, 14.9, 12.6, 9.9, 7.6, 6.2, 6.8, 8.9, 11.5, 14.1, 16.5, 17.8],
+        56: [16.7, 14.7, 12.5, 10.1, 8.0, 6.7, 7.2, 9.2, 11.6, 13.9, 16.1, 17.3],
+        54: [16.3, 14.5, 12.5, 10.2, 8.3, 7.2, 7.6, 9.4, 11.6, 13.8, 15.8, 16.9],
+        52: [16.0, 14.3, 12.5, 10.4, 8.6, 7.5, 8.0, 9.6, 11.6, 13.7, 15.5, 16.5],
+        50: [15.7, 14.2, 12.4, 10.5, 8.8, 7.9, 8.3, 9.7, 11.7, 13.7, 15.3, 16.1],
+        48: [15.4, 14.0, 12.4, 10.6, 9.0, 8.2, 8.5, 9.9, 11.7, 13.4, 15.0, 15.8],
+        46: [15.2, 13.9, 12.4, 10.7, 9.2, 8.5, 8.8, 10.0, 11.7, 13.3, 14.8, 15.5],
+        44: [14.9, 13.7, 12.4, 10.8, 9.4, 8.7, 9.0, 10.2, 11.7, 13.3, 14.6, 15.3],
+        42: [14.7, 13.6, 12.3, 10.8, 9.6, 9.0, 9.2, 10.3, 11.7, 13.2, 14.4, 15.0],
+        40: [14.5, 13.5, 12.3, 10.9, 9.8, 9.2, 9.4, 10.4, 11.8, 13.1, 14.3, 14.8],
+        38: [14.4, 13.4, 12.3, 11.0, 9.9, 9.4, 9.6, 10.5, 11.8, 13.0, 14.1, 14.6],
+        36: [14.2, 13.3, 12.3, 11.1, 10.1, 9.6, 9.8, 10.6, 11.8, 12.9, 13.9, 14.4],
+        34: [14.0, 13.2, 12.2, 11.1, 10.2, 9.7, 9.9, 10.7, 11.8, 12.9, 13.8, 14.3],
+        32: [13.9, 13.1, 12.2, 11.2, 10.4, 9.9, 10.1, 10.8, 11.8, 12.8, 13.7, 14.1],
+        30: [13.7, 13.0, 12.2, 11.3, 10.5, 10.1, 10.2, 10.9, 11.8, 12.7, 13.5, 13.9],
+        28: [13.6, 13.0, 12.2, 11.3, 10.6, 10.2, 10.4, 11.0, 11.8, 12.7, 13.4, 13.8],
+        26: [13.5, 12.9, 12.2, 11.4, 10.7, 10.4, 10.5, 11.1, 11.9, 12.6, 13.3, 13.6],
+        24: [13.3, 12.8, 12.2, 11.4, 10.8, 10.5, 10.7, 11.2, 11.9, 12.6, 13.2, 13.5],
+        22: [13.2, 12.7, 12.1, 11.5, 10.9, 10.7, 10.8, 11.2, 11.9, 12.5, 13.1, 13.3],
+        20: [13.1, 12.7, 12.1, 11.5, 11.1, 10.8, 10.9, 11.3, 11.9, 12.5, 13.0, 13.2],
+        18: [13.0, 12.6, 12.1, 11.6, 11.2, 10.9, 11.0, 11.4, 11.9, 12.4, 12.9, 13.1],
+        16: [12.9, 12.5, 12.1, 11.6, 11.3, 11.1, 11.1, 11.5, 11.9, 12.4, 12.8, 12.9],
+        14: [12.7, 12.4, 12.1, 11.7, 11.4, 11.2, 11.2, 11.5, 11.9, 12.3, 12.7, 12.8],
+        12: [12.6, 12.4, 12.1, 11.7, 11.4, 11.3, 11.4, 11.6, 11.9, 12.3, 12.6, 12.7],
+        10: [12.5, 12.3, 12.1, 11.8, 11.5, 11.4, 11.5, 11.7, 11.9, 12.2, 12.5, 12.6],
+        8:  [12.4, 12.3, 12.1, 11.8, 11.6, 11.5, 11.6, 11.7, 12.0, 12.2, 12.4, 12.5],
+        6:  [12.3, 12.2, 12.0, 11.9, 11.7, 11.7, 11.7, 11.8, 12.0, 12.1, 12.3, 12.3],
+        4:  [12.2, 12.1, 12.0, 11.9, 11.8, 11.8, 11.8, 11.9, 12.0, 12.1, 12.2, 12.2],
+        2:  [12.1, 12.1, 12.0, 12.0, 11.9, 11.9, 11.9, 11.9, 12.0, 12.0, 12.1, 12.1],
+        0:  [12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0]
+    }
+
+    # Complemento obrigatório da Tabela 5
+    DADOS_STEFAN_BOLTZMANN_P52 = {
+        5.0: 29.35,  6.0: 29.78,  6.5: 29.99,  7.0: 30.21,  7.5: 30.42,  8.0: 30.64,  8.5: 30.86,  9.0: 31.08,  9.5: 31.30,  10.0: 31.52, 10.5: 31.74, 11.0: 31.97, 11.5: 32.19, 12.0: 32.42, 12.5: 32.65, 13.0: 32.88, 13.5: 33.11, 14.0: 33.34, 14.5: 33.57, 15.0: 33.81, 15.5: 34.04, 16.0: 34.28, 16.5: 34.52,
+        21.0: 36.71, 22.0: 37.21, 22.5: 37.47, 23.0: 37.72, 23.5: 37.98, 24.0: 38.23, 24.5: 38.49, 25.0: 38.75, 25.5: 39.01, 26.0: 39.27, 26.5: 39.53, 27.0: 39.80, 27.5: 40.06, 28.0: 40.33, 28.5: 40.60, 29.0: 40.87, 29.5: 41.14, 30.0: 41.41, 30.5: 41.69, 31.0: 41.96, 31.5: 42.24, 32.0: 42.52, 32.5: 42.80,
+        37.0: 45.37, 38.0: 45.96, 38.5: 46.26, 39.0: 46.56, 39.5: 46.85, 40.0: 47.15, 40.5: 47.46, 41.0: 47.76, 41.5: 48.06, 42.0: 48.37, 42.5: 48.68, 43.0: 48.99, 43.5: 49.30, 44.0: 49.61, 44.5: 49.92, 45.0: 50.24, 45.5: 50.56, 46.0: 50.87, 46.5: 51.19, 47.0: 51.51, 47.5: 51.84, 48.0: 52.16, 48.5: 52.49
+    }
+
+    def obter_stefan_boltzmann(self, t_media):
+        """
+        Interpolação linear contínua para a Tabela 5.
+        """
+        # Trata limites absolutos se t_media for menor que o menor ou maior que o maior da tabela
+        keys = sorted(list(self.DADOS_STEFAN_BOLTZMANN_P52.keys()))
+        if t_media <= keys[0]:
+            return self.DADOS_STEFAN_BOLTZMANN_P52[keys[0]]
+        if t_media >= keys[-1]:
+            return self.DADOS_STEFAN_BOLTZMANN_P52[keys[-1]]
+
+        # Encontra os vizinhos mais próximos
+        menor = keys[0]
+        maior = keys[-1]
+        for k in keys:
+            if k <= t_media:
+                menor = k
+            if k > t_media:
+                maior = k
+                break
+
+        if menor == maior:
+            return self.DADOS_STEFAN_BOLTZMANN_P52[menor]
+
+        v_menor = self.DADOS_STEFAN_BOLTZMANN_P52[menor]
+        v_maior = self.DADOS_STEFAN_BOLTZMANN_P52[maior]
+
+        interpolado = v_menor + (v_maior - v_menor) * (t_media - menor) / (maior - menor)
+        return round(interpolado, 2)
+
+    def calcular_declividade_delta(self, t_media):
+        """
+        Equação 21: Declividade da curva de pressão de vapor (Delta)
+        """
+        denominador = t_media + 237.3
+        if denominador == 0:
+            return 0.0
+
+        exp_term = math.exp((17.27 * t_media) / denominador)
+        numerador = 4098 * (0.6108 * exp_term)
+        delta = numerador / (denominador ** 2)
+        return round(delta, 4)
+
+    def calcular_pressao_atmosferica_p(self, altitude_z):
+        """
+        Equação 22: Pressão Atmosférica baseada na altitude (P)
+        """
+        term = 293 - 0.0065 * altitude_z
+        if term < 0:
+            term = 0.0
+
+        p = 101.3 * ((term / 293) ** 5.26)
+        return round(p, 2)
     def definir_kc_por_estagio(self, kc_inicial, kc_media, kc_final, estagio):
         if estagio == 'inicial':
             return kc_inicial
@@ -704,15 +835,14 @@ class CalculadorIrrigacao:
 
         raise ValueError("O loop iterativo não estabilizou em três casas decimais.")
     def calcular_lmax_perfil_tipo_IIa(self, H, Hvar, So, k_linha, L_inicial=50.0):
-        """
-        Determina o Comprimento Máximo da Linha Lateral sob o Perfil Tipo II-a (Declive Fraco).
-        Utiliza o algoritmo de aproximações sucessivas baseado nas equações 59, 60 e 61 da tese.
-        """
         L = L_inicial
         iteracoes = 0
         max_iteracoes = 1000
 
         while iteracoes < max_iteracoes:
+            condicao = So / (k_linha * (L ** 1.75))
+            if not (0 < condicao < 1):
+                raise ValueError(f"Condição da Equação 59 não satisfeita (deve estar entre 0 e 1): {condicao}")
             razao = So / (k_linha * (L_atual ** 1.75))
             if razao < 2.75:
                 raise ValueError(f"Restrição de limite físico não atendida (Equação 66): S0 / (k' * L^1.75) = {razao:.4f} < 2.75. O ganho por desnível não supera totalmente a perda por atrito em todas as seções.")
@@ -777,10 +907,7 @@ class CalculadorIrrigacao:
         if not (0 < condicao < 1):
             raise ValueError(f"Condição da Equação 59 não satisfeita (deve estar entre 0 e 1): {condicao}")
 
-            # Equação 61
             razao_lL = 1 - 0.56098 * (condicao ** 0.57143)
-
-            # Equação 60
             numerador = H * Hvar
             denominador = ((1 - ((1 - razao_lL) ** 2.35)) * k_linha * (L ** 1.33)) - (razao_lL * So)
 
@@ -789,11 +916,11 @@ class CalculadorIrrigacao:
 
             L_novo = numerador / denominador
 
-            # Critério de paragem
             if abs(L_novo - L) < 0.001:
                 return round(L_novo, 3)
 
             L = L_novo
+            iteracoes += 1
 
         raise Exception("O cálculo não convergiu após o número máximo de iterações.")
 
@@ -1127,38 +1254,6 @@ class CalculadorIrrigacao:
             num_subunidades_sugeridas = math.floor(24.0 / ti_horas)
 
         return tr_max, ti_horas, num_subunidades_sugeridas
-    def calcular_raio_umedecido(self, alpha, q, ko, se):
-        """
-        Calcula o raio umedecido (Rw) pela Equação 26 e verifica se a faixa contínua é rompida.
-        """
-        import math
-
-        if alpha <= 0 or ko <= 0:
-            return {"erro": "Alpha e Ko devem ser maiores que zero."}
-
-        term1 = 4 / ((alpha**2) * (math.pi**2))
-        term2 = q / (math.pi * ko)
-        term3 = 2 / (alpha * math.pi)
-
-        inside_sqrt = term1 + term2 - term3
-
-        if inside_sqrt < 0:
-            return {"erro": "Valores resultam em raiz quadrada negativa."}
-
-        rw = math.sqrt(inside_sqrt)
-
-        alerta = False
-        mensagem = ""
-
-        if se > (2 * rw):
-            alerta = True
-            mensagem = "Afastamento excessivo entre gotejadores. A faixa contínua de humidade será rompida, prejudicando as raízes."
-
-        return {
-            "rw": round(rw, 4),
-            "alerta_faixa_descontinua": alerta,
-            "mensagem": mensagem
-        }
     def calcular_raio_umedecido(self, alpha, q, ko, se=None):
         """
         Calcula o Raio Umedecido (Rw) para faixa contínua baseado na Equação 26.
