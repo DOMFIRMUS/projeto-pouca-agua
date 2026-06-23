@@ -25,6 +25,14 @@ def test_projetos_metadados_criacao(client):
     response = client.post('/api/projetos', json=payload)
     assert response.status_code == 201
 
+    # Check db
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM historico_leitura')
+    rows = cursor.fetchall()
+    assert len(rows) == 1
+    assert rows[0][1] == 40.0 or rows[0][1] is None
+    assert rows[0][2] == 40.0
     response_dup = client.post('/api/projetos', json=payload)
     assert response_dup.status_code == 400
 
@@ -129,13 +137,18 @@ def test_culturas_endpoints(client):
     assert resp.status_code == 200
     assert len(json.loads(resp.data)) > 0
 def test_hidraulica_post_missing_fields(client):
-    response = client.post('/api/classificar_perfil', json={
+    response = client.post('/api/hidraulica', json={
         'So': 0.5,
         'k_linha': 1.0
     })
     assert response.status_code == 400
     data = json.loads(response.data)
     assert 'erro' in data
+    assert "Os campos" in data['erro']
+    assert "obrigatórios" in data['erro']
+
+def test_hidraulica_post_invalid_type(client):
+    response = client.post("/api/hidraulica", json={
     assert "Dados insuficientes" in data['erro']
     assert "Parâmetros insuficientes" in data.get('erro', '') or "Dados insuficientes" in data.get('erro', '')
 
@@ -149,6 +162,7 @@ def test_hidraulica_post_invalid_type(client):
     data = json.loads(response.data)
     assert 'erro' in data
     assert "Os valores do fluxo avançado devem ser numéricos." in data['erro']
+
 
 def test_hidraulica_post_perfil_iid(client):
     response = client.post('/api/hidraulica', json={
@@ -190,9 +204,9 @@ def test_hidraulica_post_mixed_payload(client):
     assert response.status_code == 200
     data = json.loads(response.data)
     assert 'classificacao' in data
-    assert data['classificacao'] == 'Perfil Tipo IId (Declive Muito Forte)'
-    assert 'L_max' in data
-    assert data['L_max'] == 50.99
+    assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
+    assert 'perda_carga_mca' in data
+    assert data['status'] == "Aceitável"
     assert 'perda_carga_mca' in data
     assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
     assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'

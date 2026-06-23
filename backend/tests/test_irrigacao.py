@@ -33,7 +33,7 @@ def test_avaliar_status_solo_encharcado():
 def test_calcular_eto_blaney_criddle():
     calc = CalculadorIrrigacao()
     # ETo para Lat 20 (Janeiro = 30%), t_media = 25
-    eto = calc.calcular_eto_blaney_criddle(25, 1, latitude_sul=20)
+    eto = calc.calcular_eto_blaney_criddle(25, 1)
     assert eto == 5.87
 
     # Test Lat 60 Sul in December (40%), t_media = 25
@@ -610,3 +610,42 @@ def test_calcular_raio_umedecido():
     # Alert, se = 6.0 > 5.76
     res4 = calc.calcular_raio_umedecido(alpha2, q2, ko2, se=6.0)
     assert res4["alerta"] == "a faixa contínua será rompida"
+
+def test_obter_stefan_boltzmann_interpolacao_continua():
+    calc = CalculadorIrrigacao()
+    # Ponto exato da tabela
+    assert calc.obter_stefan_boltzmann(25.0) == 38.75
+    # Valor intermediário: T = 25.2.
+    # Em 25.0 -> 38.75. Em 25.5 -> 39.01. Diff = 0.26.
+    # 25.2 é 40% do caminho. 0.26 * 0.4 = 0.104
+    # 38.75 + 0.104 = 38.854 -> 38.85
+    assert calc.obter_stefan_boltzmann(25.2) == 38.85
+
+    # Limites (edge cases)
+    assert calc.obter_stefan_boltzmann(1.0) == 29.35  # Menor que o mínimo
+    assert calc.obter_stefan_boltzmann(50.0) == 52.49 # Maior que o máximo
+
+def test_calcular_declividade_delta():
+    calc = CalculadorIrrigacao()
+    # T_media = 20.0 (Standard)
+    delta_20 = calc.calcular_declividade_delta(20.0)
+    assert isinstance(delta_20, float)
+    # T_media = 30.0 (Standard)
+    delta_30 = calc.calcular_declividade_delta(30.0)
+    assert isinstance(delta_30, float)
+
+    # Teste de proteção de denominador zero: (t_media + 237.3) = 0 => t_media = -237.3
+    delta_zero = calc.calcular_declividade_delta(-237.3)
+    assert delta_zero == 0.0
+
+def test_calcular_pressao_atmosferica_p():
+    calc = CalculadorIrrigacao()
+
+    # Altitude zero (Nível do Mar)
+    p_sea_level = calc.calcular_pressao_atmosferica_p(0.0)
+    assert p_sea_level == 101.3
+
+    # Stress test: Extremely high altitude triggering conditional fallback
+    # 293 - 0.0065 * z < 0 => z > 45076.92
+    p_extreme = calc.calcular_pressao_atmosferica_p(50000.0)
+    assert p_extreme == 0.0

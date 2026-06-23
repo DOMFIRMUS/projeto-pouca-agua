@@ -24,9 +24,8 @@ from backend.database import (
 from backend.models.irrigacao import CalculadorIrrigacao
 from models.irrigacao import CalculadorIrrigacao
 import datetime
+from database import obter_projeto_por_codigo, obter_resumo_hidraulico, init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, insert_projeto, get_projeto_metadados, get_bancos, insert_banco, delete_banco, insert_projeto_metadados
 from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_projeto_metadados, get_bancos, insert_banco, delete_banco, insert_projeto
-
-
 from database import obter_projeto_por_codigo, obter_resumo_hidraulico, init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_projeto_metadados, insert_projeto
 from database import init_db, obter_projeto_por_codigo, obter_resumo_hidraulico, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_bancos, insert_banco, delete_banco
 from database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, insert_projeto
@@ -156,7 +155,8 @@ def obter_status():
     # Verifica se foi enviada a condutividade elétrica da água via query params
     ce_agua_ds_m = request.args.get('ce_agua_ds_m', default=0.5, type=float)
     metodo_eto = request.args.get('metodo_eto', 'hargreaves')
-    calc = _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agua_ds_m, metodo_eto)
+    codigo_projeto = request.args.get('codigo_projeto', None)
+    calc = _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agua_ds_m, metodo_eto, codigo_projeto)
 
     # Atualiza o status e o tempo calculado no banco de dados
     update_leitura_status(
@@ -192,6 +192,11 @@ def obter_status():
 
     raio_umedecido_info = calculador.calcular_raio_umedecido(alpha, q, ko, se)
 
+    if alerta_salinidade and alerta_salinidade.get("salinidade_critica"):
+        calc["analise"]["mensagem"] += " Alerta: Ocorrerá decréscimo na produtividade."
+    elif ce_agua_ds_m > dados_sistema["ce_solo_min"]:
+        calc["analise"]["mensagem"] += " Alerta: Ocorrerá decréscimo na produtividade."
+
     response_json = {
         "umidade_atual": umidade_atual,
         "status_solo": calc["analise"]["status"],
@@ -219,6 +224,8 @@ def obter_status():
             "tempo_irrigacao_calculado_minutos": calc["tempo_irrigacao_calculado_minutos"],
             "fracao_lixiviacao": calc["fl"],
             "irrigacao_total_necessaria_mm": calc["itn"],
+            "delta_kPa": calc["delta_kPa"],
+            "pressao_atm_kPa": calc["pressao_atm_kPa"],
             "deficit_pressao_vapor_kpa": calc.get("deficit_pressao_vapor_kpa", 0.0)
             "irrigacao_total_necessaria_mm": calc["itn"]
             "irrigacao_total_necessaria_mm": calc["itn"],
@@ -226,10 +233,12 @@ def obter_status():
     }
 
     if alerta_salinidade:
-        resposta_json.update(alerta_salinidade)
+        response_json.update(alerta_salinidade)
 
-    return jsonify(resposta_json), 200
     if raio_umedecido_info.get("alerta_faixa_descontinua"):
+        response_json["alerta_faixa_descontinua"] = True
+        response_json["mensagem_faixa"] = "Afastamento excessivo entre gotejadores. A faixa contínua de humidade será rompida, prejudicando as raízes."
+    elif raio_umedecido_info.get("alerta"):
         response_json["alerta_faixa_descontinua"] = True
         response_json["mensagem_faixa"] = "Afastamento excessivo entre gotejadores. A faixa contínua de humidade será rompida, prejudicando as raízes."
 
@@ -274,7 +283,8 @@ def receber_dados_sensor():
     if 'temperatura_min' in dados_recebidos:
         temperatura_min = float(dados_recebidos['temperatura_min'])
 
-    calc = _calcular_engenharia(temperatura_max, temperatura_min, umidade, 0.5)
+    codigo_projeto = dados_recebidos.get('codigo_projeto', None)
+    calc = _calcular_engenharia(temperatura_max, temperatura_min, umidade, 0.5, codigo_projeto=codigo_projeto)
 
     insert_leitura(
         umidade,
@@ -1103,6 +1113,112 @@ def consolidacao_resultados(codigo_projeto):
             "dimensionamento_subunidade": "Dados não simulados"
         }), 200
 
+def _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agua_ds_m, metodo_eto='hargreaves', codigo_projeto=None):
+    from database import get_projeto_metadados
+    altitude_z = 0.0
+    if codigo_projeto:
+        metadados = get_projeto_metadados(codigo_projeto)
+        if metadados:
+             altitude_z = float(metadados.get('altura', 0.0))
+    t_media = (temperatura_max + temperatura_min) / 2
+
+    if metodo_eto.lower() == 'blaney-criddle':
+        eto = calculador.calcular_eto_blaney_criddle(
+            t_media,
+            mes_index=dados_sistema["mes_atual"]
+        )
+    elif metodo_eto.lower() == 'penman-monteith':
+        # Penman-Monteith required inputs, using defaults for robustness if not passed
+        rn = float(request.args.get('rn', 15.0))
+        g = float(request.args.get('g', 0.0))
+        u2 = float(request.args.get('u2', 2.0))
+        es = float(request.args.get('es', 3.0))
+        ea = float(request.args.get('ea', 1.5))
+        delta = float(request.args.get('delta', 0.15))
+        gama = float(request.args.get('gama', 0.066))
+
+        eto = calculador.calcular_eto_penman_monteith(
+            rn, g, t_media, u2, es, ea, delta, gama
+        )
+    else:
+        eto = calculador.calcular_eto_hargreaves(
+            temperatura_max,
+            temperatura_min,
+            latitude=-22.0,
+            mes_index=dados_sistema["mes_atual"]
+        )
+
+    cad, irn_max = calculador.calcular_irn_e_cad(
+        dados_sistema["solo_cc"],
+        dados_sistema["solo_pmp"],
+        dados_sistema["profundidade_raiz_m"],
+        dados_sistema["fator_deplecao_f"],
+        dados_sistema["porcentagem_umedecida_pw"],
+        etc_calculada=eto
+    )
+
+    turno_rega_max_dias = calculador.calcular_turno_rega_max(
+        irn_max_mm=irn_max,
+        etc_mm_dia=eto,
+        sp_m=dados_sistema["espacamento_plantas_m"],
+        sr_m=dados_sistema["espacamento_fileiras_m"]
+    )
+
+    fl, itn = calculador.calcular_itn(
+        irn_max,
+        ce_agua_ds_m,
+        dados_sistema["ce_solo_min"],
+        dados_sistema["ce_solo_max"],
+        dados_sistema["uniformidade_emissao_decimal"]
+    )
+
+    ti_horas, np_emissores = calculador.calcular_tempo_irrigacao(
+        itn_mm=itn,
+        espacamento_plantas_sp=dados_sistema["espacamento_plantas_m"],
+        espacamento_fileiras_sr=dados_sistema["espacamento_fileiras_m"],
+        pw_area_umedecida=dados_sistema["porcentagem_umedecida_pw"],
+        dw_diametro_molhado=dados_sistema["dw_diametro_molhado"],
+        vazao_emissor_qa=dados_sistema["vazao_emissor_qa"]
+    )
+
+    tempo_irrigacao_calculado_minutos = int(ti_horas * 60)
+    agenda_rega = calculador.fracionar_tempo_irrigacao(ti_horas, 2.0)
+
+    # Simplified hydraulic assumption for the dashboard overview
+    diametro_mm = 16.0
+    vazao_gotejador_lh = dados_sistema["vazao_emissor_qa"]
+    espacamento_m = dados_sistema["espacamento_plantas_m"]
+    comprimento_m = 50.0
+
+    resultado_perda = calculador.calcular_perda_carga(
+        diametro_mm, vazao_gotejador_lh, espacamento_m, comprimento_m
+    )
+
+    analise_solo = calculador.avaliar_status_solo(umidade_atual)
+
+    delta_kPa = calculador.calcular_declividade_delta(t_media)
+    pressao_atm_kPa = calculador.calcular_pressao_atmosferica_p(altitude_z)
+
+    return {
+        "eto": eto,
+        "cad": cad,
+        "irn_max": irn_max,
+        "ti_horas": ti_horas,
+        "np_emissores": np_emissores,
+        "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
+        "agenda_rega": agenda_rega,
+        "turno_rega_max_dias": turno_rega_max_dias,
+        "fl": fl,
+        "itn": itn,
+        "analise": analise_solo,
+        "comprimento_lateral_m": comprimento_m,
+        "perda_carga_total_mca": resultado_perda.get("perda_carga_mca", 0.0),
+        "delta_kPa": delta_kPa,
+        "pressao_atm_kPa": pressao_atm_kPa
+    }
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
 @app.route('/api/projetos/<string:codigo_projeto>/area-sombreada', methods=['POST'])
 def calcular_e_salvar_area_sombreada(codigo_projeto):
     try:
