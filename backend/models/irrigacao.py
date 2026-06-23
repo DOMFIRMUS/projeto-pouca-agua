@@ -1155,3 +1155,70 @@ class CalculadorIrrigacao:
                 resultado["alerta"] = "a faixa contínua será rompida"
 
         return resultado
+
+    def resolver_lmax_perfil_iii(self, pressao_h, h_var_fraction, k_linha, declividade_so, max_iter=300, tol=1e-4):
+        """
+        Solver Iterativo Numérico para o Perfil Tipo III (Equação 67 - Pág. 72).
+        L_n+1 = (H * H_var) / ((So - k' * L_n^1.75) * (1 - H_var))
+        """
+        So = abs(declividade_so)
+        L_n = 1.0 # Chute inicial seguro
+
+        for iteracao in range(max_iter):
+            abs_L = abs(L_n)
+            denominador = (So - k_linha * (abs_L ** 1.75)) * (1.0 - h_var_fraction)
+
+            # Trava de Segurança
+            if denominador <= 0:
+                return 0.0
+
+            L_novo = (pressao_h * h_var_fraction) / denominador
+
+            if abs(L_novo - L_n) < tol:
+                return round(L_novo, 3)
+
+            L_n = L_novo
+
+        return round(L_n, 3)
+
+    def orquestrar_comprimento_declive(self, pressao_h, h_var_fraction, k_linha, declividade_so):
+        """
+        Orquestrador Mestre de Linhas em Declive (Algoritmo Sequencial da Pág. 72).
+        Árvore sequencial de fallbacks: Tipo II-a -> II-b -> II-c -> II-d -> Tipo III
+        """
+        # Tentativa 1: Perfil Tipo II-a
+        try:
+            l_iia = self.calcular_lmax_perfil_tipo_IIa(pressao_h, h_var_fraction, abs(declividade_so), k_linha)
+            if l_iia is not None:
+                return l_iia, 'Perfil Tipo II-a'
+        except Exception:
+            pass
+
+        # Tentativa 2: Perfil Tipo II-b
+        try:
+            # We need an estimated L for IIb, we use a basic guess
+            l_iib = self.calcular_lmax_perfil_tipo_IIb(pressao_h, h_var_fraction, abs(declividade_so), k_linha, L_estimado=50.0)
+            if l_iib is not None:
+                return l_iib, 'Perfil Tipo II-b'
+        except Exception:
+            pass
+
+        # Tentativa 3: Perfil Tipo II-c
+        try:
+            l_iic = self.calcular_lmax_perfil_tipo_IIc(pressao_h, h_var_fraction, abs(declividade_so), k_linha)
+            if l_iic is not None:
+                return l_iic, 'Perfil Tipo II-c'
+        except Exception:
+            pass
+
+        # Tentativa 4: Perfil Tipo II-d
+        try:
+            l_iid = self.calcular_lmax_perfil_tipo_IId(pressao_h, h_var_fraction, abs(declividade_so), k_linha)
+            if l_iid is not None:
+                return l_iid, 'Perfil Tipo II-d'
+        except Exception:
+            pass
+
+        # Solução Final: Perfil Tipo III
+        l_iii = self.resolver_lmax_perfil_iii(pressao_h, h_var_fraction, k_linha, declividade_so)
+        return l_iii, 'Perfil Tipo III'

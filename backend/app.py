@@ -6,6 +6,7 @@ from flask_cors import CORS
 from backend.models.irrigacao import CalculadorIrrigacao
 import datetime
 from backend.database import obter_projeto_por_codigo, obter_resumo_hidraulico, init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_projeto_metadados, insert_projeto
+from backend.database import salvar_hidraulica_lateral
 from backend.database import init_db, obter_projeto_por_codigo, obter_resumo_hidraulico, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_bancos, insert_banco, delete_banco
 from backend.database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, insert_projeto
 
@@ -1151,3 +1152,52 @@ def calcular_e_salvar_area_sombreada(codigo_projeto):
 
     except Exception as e:
         return jsonify({'erro': 'Erro interno do servidor', 'detalhes': str(e)}), 500
+
+@app.route('/api/projetos/<string:codigo_projeto>/linha-lateral-definitiva', methods=['POST'])
+def linha_lateral_definitiva(codigo_projeto):
+    """
+    Roteamento interno superior para cálculo do L_max da linha lateral (Rotina de Declive e Plano/Aclive).
+    """
+    dados = request.get_json()
+    if not dados:
+        return jsonify({"erro": "Nenhum dado enviado."}), 400
+
+    required_fields = ['pressao_h', 'h_var_fraction', 'k_linha', 'declividade_so']
+    for field in required_fields:
+        if field not in dados:
+            return jsonify({"erro": f"Campo obrigatório ausente: {field}"}), 400
+
+    projeto = get_projeto_metadados(codigo_projeto)
+    if not projeto:
+        return jsonify({"erro": "Projeto inexistente."}), 404
+
+    try:
+        pressao_h = float(dados['pressao_h'])
+        h_var_fraction = float(dados['h_var_fraction'])
+        k_linha = float(dados['k_linha'])
+        declividade_so = float(dados['declividade_so'])
+
+        calc = CalculadorIrrigacao()
+
+        if declividade_so >= 0:
+            # Perfil Tipo I
+            l_max = calc.calcular_lmax_perfil_tipo_I(pressao_h, h_var_fraction, declividade_so, k_linha)
+            perfil = "Perfil Tipo I (Plano/Aclive)"
+            status = "safe"
+        else:
+            # Perfil Tipo II/III (Declive)
+            l_max, perfil = calc.orquestrar_comprimento_declive(pressao_h, h_var_fraction, k_linha, declividade_so)
+            status = "seguro" if l_max > 0.0 else "divisao_por_zero_evitada"
+
+        if salvar_hidraulica_lateral(codigo_projeto, perfil, float(l_max), status):
+            return jsonify({
+                "status": "sucesso",
+                "perfil_selecionado": perfil,
+                "comprimento_limite_m": round(l_max, 3),
+                "denominador_seguro_status": status
+            }), 200
+        else:
+            return jsonify({"erro": "Erro ao salvar no banco de dados."}), 500
+
+    except Exception as e:
+        return jsonify({"erro": f"Erro matemático/interno: {str(e)}"}), 400
