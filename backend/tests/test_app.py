@@ -93,9 +93,7 @@ def test_historico_get(client):
     assert data[0]['umidade'] == 45.0
     assert data[1]['umidade'] == 40.0
 
-def test_hidraulica_post_perfil_success(client):
 def test_hidraulica_post_success(client):
-    response = client.post('/api/hidraulica_classificacao', json={
     payload = {
         "diametro_mm": 16,
         "vazao_gotejador_lh": 2,
@@ -103,13 +101,8 @@ def test_hidraulica_post_success(client):
         "comprimento_m": 50
     }
     response = client.post('/api/hidraulica', data=json.dumps(payload), content_type='application/json')
-    response = client.post('/api/hidraulica/perfil', json={
-    response = client.post('/api/hidraulica_perfil', json={
-    response = client.post('/api/classificar_hidraulica', json={
 def test_hidraulica_post_success_advanced(client):
     response = client.post('/api/hidraulica', json={
-def test_hidraulica_post_success(client):
-    response = client.post('/api/classificar_perfil', json={
         'So': 0.5,
         'k_linha': 1.0,
         'L_estimado': 1.0

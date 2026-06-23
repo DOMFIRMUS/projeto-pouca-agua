@@ -309,50 +309,6 @@ def get_historico():
     conn.close()
     return [dict(row) for row in rows]
 
-def obter_projeto_por_codigo(codigo_projeto):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM projetos_metadados WHERE codigo_projeto = ?', (codigo_projeto,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return dict(row)
-    return None
 
-def obter_resumo_hidraulico(codigo_projeto):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT * FROM historico_leitura
-        WHERE codigo_projeto = ?
-        ORDER BY id DESC LIMIT 1
-    ''', (codigo_projeto,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return dict(row)
-    return None
 
-def obter_projeto_por_codigo(codigo_projeto):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM projetos_metadados WHERE codigo_projeto = ?', (codigo_projeto,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return dict(row)
-    return None
 
-def obter_resumo_hidraulico(codigo_projeto):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT * FROM historico_leitura
-        WHERE codigo_projeto = ?
-        ORDER BY id DESC LIMIT 1
-    ''', (codigo_projeto,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return dict(row)
-    return None
