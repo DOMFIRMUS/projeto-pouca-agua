@@ -114,6 +114,21 @@ def init_db():
             taxa_mensal REAL NOT NULL
         )
     """)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS projeto_hidraulica_derivacao (
+            codigo_projeto TEXT PRIMARY KEY,
+            declividade_derivacao REAL,
+            pressao_entrada_h REAL,
+            comprimento_total_l REAL,
+            vazao_ql REAL,
+            espacamento_sl REAL,
+            distancia_sl1 REAL,
+            variacao_hvar REAL,
+            estrategia_dimensionamento TEXT,
+            zitterell_faixa_status INTEGER,
+            FOREIGN KEY(codigo_projeto) REFERENCES projetos_metadados(codigo_projeto)
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -136,12 +151,6 @@ def update_area_umedecida_projeto(codigo_projeto, rw, dw, pw, tipo_disposicao, c
         SET rw_raio_umedecido = ?, dw_diametro_molhado = ?, pw_area_umedecida = ?,
             tipo_disposicao = ?, configuracao_linha = ?, parametro_alpha = ?, condutividade_ko = ?, profundidade_z = ?
         WHERE codigo_projeto = ?
-    """, (rw, dw, pw, tipo_disposicao, configuracao_linha, parametro_alpha, condutividade_ko, profundidade_z, codigo_projeto))
-    conn.commit()
-    conn.close()
-
-def update_area_sombreada_projeto(codigo_projeto, ps, tipo_calculo, ss_largura_faixa, dco_diametro_copa):
-    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         UPDATE projetos_metadados
@@ -162,40 +171,6 @@ def update_area_sombreada_projeto(codigo_projeto, ps, tipo_calculo, ss_largura_f
     # Try to add missing columns in case the table already exists
     cursor.execute("PRAGMA table_info(projetos_metadados)")
     columns = [info[1] for info in cursor.fetchall()]
-    novas_colunas = {
-        'tipo_calculo_ps': 'TEXT CHECK(tipo_calculo_ps IN (\'faixa_sombreada\', \'diametro_copa\', NULL))',
-        'ss_largura_faixa': 'REAL',
-        'dco_diametro_copa': 'REAL',
-        'ps_calculado': 'REAL'
-    }
-    for col, tipo in novas_colunas.items():
-        if col not in columns:
-            try:
-                cursor.execute(f'ALTER TABLE projetos_metadados ADD COLUMN {col} {tipo}')
-            except Exception as e:
-                pass
-
-    conn.commit()
-    conn.close()
-
-def insert_projeto(dados):
-def insert_projeto(codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao):
-def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, profundidade):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("""
-            INSERT INTO projetos_metadados (
-                codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario,
-                nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            codigo_projeto,
-            nome_projeto,
-            nome_propriedade,
-            nome_proprietario,
-            nome_projetista,
-            identificacao,
             nome_codigo_subunidade,
             area_total_irrigada,
             area_subunidade,
@@ -571,6 +546,47 @@ def insert_projeto(dados):
         conn.commit()
         return True
     except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+def salvar_hidraulica_derivacao(codigo_projeto, declividade_derivacao, pressao_entrada_h,
+                               comprimento_total_l, vazao_ql, espacamento_sl, distancia_sl1,
+                               variacao_hvar, estrategia_dimensionamento, zitterell_faixa_status):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT 1 FROM projetos_metadados WHERE codigo_projeto = ?', (codigo_projeto,))
+    if not cursor.fetchone():
+        conn.close()
+        return False
+
+    try:
+        cursor.execute('''
+            INSERT INTO projeto_hidraulica_derivacao (
+                codigo_projeto, declividade_derivacao, pressao_entrada_h, comprimento_total_l,
+                vazao_ql, espacamento_sl, distancia_sl1, variacao_hvar, estrategia_dimensionamento,
+                zitterell_faixa_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(codigo_projeto) DO UPDATE SET
+                declividade_derivacao=excluded.declividade_derivacao,
+                pressao_entrada_h=excluded.pressao_entrada_h,
+                comprimento_total_l=excluded.comprimento_total_l,
+                vazao_ql=excluded.vazao_ql,
+                espacamento_sl=excluded.espacamento_sl,
+                distancia_sl1=excluded.distancia_sl1,
+                variacao_hvar=excluded.variacao_hvar,
+                estrategia_dimensionamento=excluded.estrategia_dimensionamento,
+                zitterell_faixa_status=excluded.zitterell_faixa_status
+        ''', (
+            codigo_projeto, declividade_derivacao, pressao_entrada_h, comprimento_total_l,
+            vazao_ql, espacamento_sl, distancia_sl1, variacao_hvar, estrategia_dimensionamento,
+            zitterell_faixa_status
+        ))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error in salvar_hidraulica_derivacao: {e}")
         return False
     finally:
         conn.close()

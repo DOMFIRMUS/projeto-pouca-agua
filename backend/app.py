@@ -218,10 +218,8 @@ def obter_status():
             "numero_emissores_por_planta": calc["np_emissores"],
             "tempo_irrigacao_calculado_minutos": calc["tempo_irrigacao_calculado_minutos"],
             "fracao_lixiviacao": calc["fl"],
-            "irrigacao_total_necessaria_mm": calc["itn"],
-            "deficit_pressao_vapor_kpa": calc.get("deficit_pressao_vapor_kpa", 0.0)
+            "deficit_pressao_vapor_kpa": calc.get("deficit_pressao_vapor_kpa", 0.0),
             "irrigacao_total_necessaria_mm": calc["itn"]
-            "irrigacao_total_necessaria_mm": calc["itn"],
         }
     }
 
@@ -1151,3 +1149,70 @@ def calcular_e_salvar_area_sombreada(codigo_projeto):
 
     except Exception as e:
         return jsonify({'erro': 'Erro interno do servidor', 'detalhes': str(e)}), 500
+
+
+@app.route('/api/projetos/<string:codigo_projeto>/linha-derivacao', methods=['POST'])
+def configurar_linha_derivacao(codigo_projeto):
+    '''
+    Rotina 10 - Dimensionamento da Linha de Derivação (Pág 74)
+    '''
+    dados = request.get_json()
+    if not dados:
+        return jsonify({"erro": "Payload invalido"}), 400
+
+    from backend.database import obter_projeto_por_codigo, salvar_hidraulica_derivacao
+    projeto = obter_projeto_por_codigo(codigo_projeto)
+    if not projeto:
+        return jsonify({"erro": "Projeto não encontrado"}), 404
+
+    campos_obrigatorios = [
+        'declividade_derivacao', 'pressao_entrada_h', 'comprimento_total_l',
+        'vazao_ql', 'espacamento_sl', 'distancia_sl1', 'variacao_hvar'
+    ]
+
+    for campo in campos_obrigatorios:
+        if campo not in dados or dados[campo] is None:
+            return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
+
+    try:
+        declividade = float(dados['declividade_derivacao'])
+        h_pressao = float(dados['pressao_entrada_h'])
+        l_comprimento = float(dados['comprimento_total_l'])
+        ql_vazao = float(dados['vazao_ql'])
+        sl_espacamento = float(dados['espacamento_sl'])
+        sl1_distancia = float(dados['distancia_sl1'])
+        hvar_limite = float(dados['variacao_hvar'])
+    except ValueError:
+        return jsonify({"erro": "Os parâmetros obrigatórios devem ser numéricos."}), 400
+
+    zitterell_status = 1
+    alertas_zitterell = []
+    z_fields = ['die', 'dis', 'lc', 'dt', 'vt', 'reynolds']
+    if all(k in dados and dados[k] is not None for k in z_fields):
+        try:
+            validador = calculador.validar_limites_conector_zitterell(
+                float(dados['die']), float(dados['dis']), float(dados['lc']),
+                float(dados['dt']), float(dados['vt']), float(dados['reynolds'])
+            )
+            if not validador['valido']:
+                zitterell_status = 0
+                alertas_zitterell = validador['alertas']
+        except ValueError:
+            pass
+
+    resultado = calculador.orquestrar_dimensionamento_derivacao(
+        declividade, h_pressao, l_comprimento, ql_vazao, sl_espacamento, sl1_distancia, hvar_limite
+    )
+
+    salvar_hidraulica_derivacao(
+        codigo_projeto, declividade, h_pressao, l_comprimento, ql_vazao,
+        sl_espacamento, sl1_distancia, hvar_limite, resultado['estrategia_dimensionamento'],
+        zitterell_status
+    )
+
+    resposta = {
+        **resultado,
+        'alertas': alertas_zitterell
+    }
+
+    return jsonify(resposta), 200
