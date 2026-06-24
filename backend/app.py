@@ -1151,3 +1151,50 @@ def calcular_e_salvar_area_sombreada(codigo_projeto):
 
     except Exception as e:
         return jsonify({'erro': 'Erro interno do servidor', 'detalhes': str(e)}), 500
+
+@app.route('/api/projetos/<string:codigo_projeto>/linha-lateral-declive', methods=['POST'])
+def calcular_linha_lateral_declive_endpoint(codigo_projeto):
+    try:
+        dados = request.get_json()
+        if not dados:
+            return jsonify({'erro': 'Nenhum dado JSON fornecido'}), 400
+
+        from backend.database import get_projeto_metadados, insert_projeto_hidraulica_lateral
+        projeto = get_projeto_metadados(codigo_projeto)
+        if not projeto:
+            return jsonify({'erro': 'Projeto inexistente. Configure os metadados primeiro.'}), 404
+
+        H = float(dados.get('H', 10.0))
+        H_var = float(dados.get('H_var', 0.2))
+        So = float(dados.get('So', 0.05))
+        k_linha = float(dados.get('k_linha', 1.5e-5))
+        q_media = float(dados.get('q_media', 2.0))
+        se_vazao = float(dados.get('se_vazao', 0.5))
+        L_estimado = float(dados.get('L_estimado', 50.0))
+
+        from backend.models.irrigacao import CalculadorIrrigacao
+        calc = CalculadorIrrigacao()
+
+        perfil = calc.classificar_perfil_pressao(So, k_linha, L_estimado)
+        l_max = 0.0
+
+        if 'Perfil Tipo IIc' in perfil:
+            l_max = calc.resolver_lmax_perfil_ii_c(H, H_var, k_linha, So)
+            status_op = "Calculado com Sucesso"
+        elif 'Perfil Tipo IId' in perfil:
+            status_op = "Registrado Perfil Extremo"
+        else:
+            status_op = "Fora da faixa de declive forte"
+
+        insert_projeto_hidraulica_lateral(codigo_projeto, k_linha, se_vazao, q_media, l_max, perfil)
+
+        return jsonify({
+            'perfil': perfil,
+            'l_max': l_max,
+            'status': status_op
+        }), 200
+
+    except ValueError as e:
+        return jsonify({'erro': 'Os valores devem ser numericos.'}), 400
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
