@@ -12,12 +12,8 @@ const elements = {
     dataEto: document.getElementById('data-eto'),
     dataCad: document.getElementById('data-cad'),
     dataIrn: document.getElementById('data-irn'),
-    historyList: document.getElementById('history-list'),
-    pressaoChart: document.getElementById('pressaoChart')
+    historyList: document.getElementById('history-list')
 };
-
-// Variável para armazenar a instância do gráfico de pressão
-let graficoPressaoInstance = null;
 
 /**
  * Mapeia o status retornado pela API para as classes CSS
@@ -151,79 +147,11 @@ async function fetchHistory() {
 }
 
 /**
- * Desenha o Gráfico de Perfil de Pressão Hidráulica
- * @param {Array} dadosPressao - Array de objetos com {x: comprimento, y: pressao}
- */
-function desenharGraficoPressao(dadosPressao) {
-    if (!elements.pressaoChart || !dadosPressao || dadosPressao.length === 0) return;
-
-    // Destruir gráfico anterior se existir
-    if (graficoPressaoInstance) {
-        graficoPressaoInstance.destroy();
-    }
-
-    const pressaoInicial = dadosPressao[0].y;
-    const pressaoFinal = dadosPressao[dadosPressao.length - 1].y;
-
-    let corLinha = 'green';
-    if (pressaoFinal <= pressaoInicial * 0.8) {
-        corLinha = 'red'; // Perfil Tipo I crítico
-    } else if (pressaoFinal > pressaoInicial) {
-        corLinha = 'blue'; // Perfil Tipo II em declive
-    }
-
-    const ctx = elements.pressaoChart.getContext('2d');
-    graficoPressaoInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-            datasets: [{
-                label: 'Perfil de Pressão',
-                data: dadosPressao,
-                borderColor: corLinha,
-                backgroundColor: corLinha,
-                borderWidth: 2,
-                fill: false,
-                tension: 0.1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    type: 'linear',
-                    title: {
-                        display: true,
-                        text: 'Comprimento da Linha (m)'
-                    }
-                },
-                y: {
-                    title: {
-                        display: true,
-                        text: 'Pressão (mca)'
-                    }
-                }
-            }
-        }
-    });
-}
-
-/**
  * Atualiza todos os dados
  */
 function refreshData() {
     fetchStatus();
     fetchHistory();
-
-    // Mockup para demonstração do gráfico de pressão (como não temos endpoint específico na API original ainda)
-    const mockDadosPressao = [
-        { x: 0, y: 10 },
-        { x: 10, y: 9.5 },
-        { x: 20, y: 8.8 },
-        { x: 30, y: 8.0 },
-        { x: 40, y: 7.5 } // Queda de mais de 20%, deve ficar vermelho
-    ];
-    desenharGraficoPressao(mockDadosPressao);
 }
 
 // Inicialização
