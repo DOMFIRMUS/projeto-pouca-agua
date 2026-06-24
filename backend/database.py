@@ -16,6 +16,27 @@ def init_db():
     conn = sqlite3.connect("irrigacao.db")
     cursor = conn.cursor()
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS historico_leitura (
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS projeto_perdas_conexoes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo_projeto TEXT NOT NULL,
+            v_d REAL,
+            d_d REAL,
+            a_p REAL,
+            hfl_d REAL,
+            d_c REAL,
+            l_c REAL,
+            v_c REAL,
+            v_l REAL,
+            hfl_l REAL,
+            vilaca_limites_status INTEGER CHECK(vilaca_limites_status IN (0, 1)),
+            data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (codigo_projeto) REFERENCES projetos_metadados(codigo_projeto)
+        )
+    ''')
+cursor.execute('''
         CREATE TABLE IF NOT EXISTS projetos_metadados (
             codigo_projeto TEXT PRIMARY KEY,
             nome TEXT,
@@ -972,6 +993,28 @@ def salvar_dados_solo_irn(codigo_projeto, theta_cc, theta_pmp, fator_f, cad_calc
     finally:
         conn.close()
 
+
+def salvar_perdas_conexoes(codigo_projeto, v_d, d_d, a_p, hfl_d, d_c, l_c, v_c, v_l, hfl_l, limites_status):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT 1 FROM projetos_metadados WHERE codigo_projeto = ?', (codigo_projeto,))
+    if not cursor.fetchone():
+        conn.close()
+        return False
+
+    try:
+        cursor.execute('''
+            INSERT INTO projeto_perdas_conexoes
+            (codigo_projeto, v_d, d_d, a_p, hfl_d, d_c, l_c, v_c, v_l, hfl_l, vilaca_limites_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (codigo_projeto, v_d, d_d, a_p, hfl_d, d_c, l_c, v_c, v_l, hfl_l, limites_status))
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        return False
+    finally:
+        conn.close()
 def get_bancos(): return []
 def insert_banco(*args, **kwargs): pass
 def delete_banco(*args, **kwargs): pass

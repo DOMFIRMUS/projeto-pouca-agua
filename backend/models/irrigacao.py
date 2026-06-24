@@ -5,6 +5,54 @@ class CalculadorIrrigacao:
     def calcular_cad(self, theta_cc, theta_pmp, z):
         if float(theta_cc) < float(theta_pmp) or float(z) <= 0:
 
+    def validar_limites_vilaca(self, v_d, d_d, a_p, d_c, l_c, v_c, v_l):
+        """
+        Valida os parâmetros do modelo de perdas localizadas segundo Vilaça (2012)
+        Página 76 da tese. Retorna dicionário contendo lista de parâmetros estourados.
+        """
+        alertas = []
+
+        # Limites Passagem Direta
+        if not (0.133 <= v_d <= 3.0): alertas.append(f"v_d={v_d} fora de (0.133 - 3.0)")
+        if not (0.0357 <= d_d <= 0.0721): alertas.append(f"d_d={d_d} fora de (0.0357 - 0.0721)")
+        if not (103e-6 <= a_p <= 355e-6): alertas.append(f"a_p={a_p} fora de (103e-6 - 355e-6)")
+
+        # Limites Passagem Lateral
+        if not (0.0078 <= d_c <= 0.0167): alertas.append(f"d_c={d_c} fora de (0.0078 - 0.0167)")
+        if not (0.0495 <= l_c <= 0.0664): alertas.append(f"l_c={l_c} fora de (0.0495 - 0.0664)")
+        if not (0.267 <= v_c <= 14.378): alertas.append(f"v_c={v_c} fora de (0.267 - 14.378)")
+        if not (0.132 <= v_l <= 3.0): alertas.append(f"v_l={v_l} fora de (0.132 - 3.0)")
+
+        return {
+            "limites_estourados": len(alertas) > 0,
+            "alertas": alertas
+        }
+
+    def calcular_perda_direta_hfl_d(self, v_d, d_d, a_p):
+        """
+        Calcula a perda localizada por passagem direta. Eq. 76, Pág 76.
+        """
+        import math
+        # Trava de Segurança Física
+        if d_d <= 0 or v_d <= 0 or a_p <= 0:
+            return 0.0
+
+        hfl_d = 0.043695 * (v_d ** 1.897) * (d_d ** -2.428) * (a_p ** 1.109)
+        return round(hfl_d, 5)
+
+    def calcular_perda_lateral_hfl_l(self, d_c, l_c, v_c, v_l):
+        """
+        Calcula a perda localizada por passagem lateral. Eq. 77, Pág 76.
+        """
+        import math
+        # Trava de Segurança Física
+        if d_c <= 0 or l_c <= 0 or v_c <= 0 or v_l <= 0:
+            return 0.0
+
+        hfl_l = 2.268121 * (d_c ** 0.106) * (l_c ** 1.057) * (v_c ** 1.766) * (v_l ** 0.386)
+        return round(hfl_l, 5)
+
+
     def obter_duracao_maxima_n(self, latitude_sul, mes_index):
         if mes_index < 1 or mes_index > 12:
             mes_index = 1

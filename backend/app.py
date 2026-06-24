@@ -1833,6 +1833,64 @@ if __name__ == '__main__':
         return jsonify({'erro': 'Erro interno do servidor', 'detalhes': str(e)}), 500
 
 
+@app.route('/api/projetos/<string:codigo_projeto>/perdas-conexoes', methods=['POST'])
+def calcular_e_salvar_perdas_conexoes(codigo_projeto):
+    try:
+        dados = request.get_json()
+        if not dados:
+            return jsonify({'erro': 'Nenhum dado JSON fornecido'}), 400
+
+        required_keys = ['v_d', 'd_d', 'a_p', 'd_c', 'l_c', 'v_c', 'v_l']
+        for k in required_keys:
+            if k not in dados or dados[k] is None:
+                return jsonify({'erro': f'Parâmetro {k} é obrigatório e não pode ser nulo.'}), 400
+
+        try:
+            v_d = float(dados['v_d'])
+            d_d = float(dados['d_d'])
+            a_p = float(dados['a_p'])
+            d_c = float(dados['d_c'])
+            l_c = float(dados['l_c'])
+            v_c = float(dados['v_c'])
+            v_l = float(dados['v_l'])
+        except ValueError:
+            return jsonify({'erro': 'Parâmetros devem ser numéricos.'}), 400
+
+        if d_d <= 0:
+            return jsonify({'erro': 'Parâmetro d_d deve ser maior que zero.'}), 400
+
+        from backend.models.irrigacao import CalculadorIrrigacao
+        calc = CalculadorIrrigacao()
+
+        validacao = calc.validar_limites_vilaca(v_d, d_d, a_p, d_c, l_c, v_c, v_l)
+        limites_status = 0 if validacao['limites_estourados'] else 1
+
+        hfl_d = calc.calcular_perda_direta_hfl_d(v_d, d_d, a_p)
+        hfl_l = calc.calcular_perda_lateral_hfl_l(d_c, l_c, v_c, v_l)
+
+        import backend.database as db
+        salvo = db.salvar_perdas_conexoes(
+            codigo_projeto=codigo_projeto,
+            v_d=v_d, d_d=d_d, a_p=a_p, hfl_d=hfl_d,
+            d_c=d_c, l_c=l_c, v_c=v_c, v_l=v_l, hfl_l=hfl_l,
+            limites_status=limites_status
+        )
+
+        if not salvo:
+            return jsonify({'erro': 'Projeto não encontrado no banco de dados'}), 404
+
+        return jsonify({
+            'status': 'sucesso',
+            'codigo_projeto': codigo_projeto,
+            'resultados': {
+                'perda_direta_hfl_d': hfl_d,
+                'perda_lateral_hfl_l': hfl_l
+            },
+            'auditoria_limites': validacao
+        }), 200
+
+    except Exception as e:
+        return jsonify({'erro': 'Erro interno do servidor', 'detalhes': str(e)}), 500
 
 @app.route("/api/projetos/<string:codigo_projeto>/irn", methods=["POST"])
 def calcular_irn_projeto(codigo_projeto):
