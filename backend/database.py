@@ -1015,6 +1015,36 @@ def salvar_perdas_conexoes(codigo_projeto, v_d, d_d, a_p, hfl_d, d_c, l_c, v_c, 
         return False
     finally:
         conn.close()
+
+def salvar_hidraulica_lateral(codigo_projeto, perfil_pressao, lmax, status):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO projeto_hidraulica_lateral (codigo_projeto, perfil_pressao_final, lmax_final_calculado, denominador_seguro_status)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(codigo_projeto) DO UPDATE SET
+                perfil_pressao_final = excluded.perfil_pressao_final,
+                lmax_final_calculado = excluded.lmax_final_calculado,
+                denominador_seguro_status = excluded.denominador_seguro_status
+        ''', (codigo_projeto, perfil_pressao, lmax, status))
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        print(f"Database error in salvar_hidraulica_lateral: {e}")
+        return False
+    finally:
+        conn.close()
+
+def obter_hidraulica_lateral(codigo_projeto):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM projeto_hidraulica_lateral WHERE codigo_projeto = ?', (codigo_projeto,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return None
 def get_bancos(): return []
 def insert_banco(*args, **kwargs): pass
 def delete_banco(*args, **kwargs): pass
