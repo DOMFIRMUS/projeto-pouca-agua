@@ -137,6 +137,12 @@ def test_hidraulica_post_success(client):
         "comprimento_m": 50
     }
     response = client.post('/api/hidraulica', data=json.dumps(payload), content_type='application/json')
+def test_hidraulica_post_success_advanced(client):
+    response = client.post('/api/hidraulica', json={
+        'So': 0.5,
+        'k_linha': 1.0,
+        'L_estimado': 1.0
+    })
     assert response.status_code == 200
 
 def test_hidraulica_post_missing_fields(client):
