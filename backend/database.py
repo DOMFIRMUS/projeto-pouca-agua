@@ -117,6 +117,7 @@ cursor.execute('''
             dias_fase_inicial INTEGER,
             dias_meia_estacao INTEGER,
             dias_fase_final INTEGER,
+
             min_ce REAL DEFAULT 1.0,
             max_ce REAL DEFAULT 3.0
         )
@@ -265,6 +266,7 @@ def vincular_cultura_projeto(codigo_projeto, cultura_id, estagio_selecionado):
     conn.commit()
     conn.close()
 
+def insert_projeto(codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao):
 def update_area_umedecida_projeto(codigo_projeto, rw, dw, pw, tipo_disposicao, configuracao_linha, parametro_alpha, condutividade_ko, profundidade_z):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -370,6 +372,22 @@ def get_projeto_metadados(codigo_projeto):
     if row:
         return dict(row)
     return None
+
+def insert_projeto_metadados(codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO projetos_metadados (codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao))
+        row_id = cursor.lastrowid
+        conn.commit()
+        return {"status": "sucesso", "id": row_id}
+    except sqlite3.IntegrityError:
+        return {"status": "erro", "mensagem": "Já existe um projeto com este código. O código do projeto deve ser único."}
+    finally:
+        conn.close()
 
 def seed_culturas():
     conn = get_db_connection()
@@ -688,6 +706,15 @@ def delete_banco(banco_id):
     conn.commit()
 
     conn.close()
+    return row_id
+
+def delete_banco(banco_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM bancos WHERE id = ?', (banco_id,))
+    conn.commit()
+    conn.close()
+
 
 def insert_projeto(codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao):
 def insert_projeto(dados):
