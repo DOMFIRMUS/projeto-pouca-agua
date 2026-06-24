@@ -988,9 +988,61 @@ class CalculadorIrrigacao:
 
         raise Exception("O cálculo não convergiu após o número máximo de iterações.")
 
+    def resolver_lmax_perfil_ii_c(self, pressao_h, h_var_fraction, k_linha, declividade_so, max_iter=300, tol=1e-4):
+        """
+        Solver iterativo para o Perfil Tipo II-c (Equação 65 - Pág. 71).
+        Utiliza o algoritmo de iteração de ponto fixo.
+        """
+        abs_so = abs(declividade_so)
+        if abs_so == 0.0:
+            return 0.0
+
+        L_n = 50.0  # Chute inicial
+
+        for _ in range(max_iter):
+            abs_l_n = abs(L_n)
+            k_L_175 = k_linha * (abs_l_n ** 1.75)
+
+            if k_L_175 == 0.0:
+                return 0.0
+
+            # Condição = |So| / (k' * L^1.75)
+            condicao = abs_so / k_L_175
+
+            # Equação 61
+            r_min = 1.0 - 0.56098 * (condicao ** 0.57143)
+
+            numerador = pressao_h * h_var_fraction
+
+            base_r_min = 1.0 - r_min
+            if base_r_min < 0:
+                base_r_min = 0.0
+
+            # Denominador da Eq 65:
+            denominador = (
+                abs_so
+                - k_L_175
+                - (r_min * abs_so)
+                + ((1.0 - (base_r_min ** 2.75)) * k_L_175)
+                - (pressao_h * h_var_fraction * (abs_so - k_L_175))
+            )
+
+            # Trava de Segurança matemática
+            if denominador == 0.0:
+                return 0.0
+
+            L_novo = abs(numerador / denominador)
+
+            if abs(L_novo - L_n) < tol:
+                return round(L_novo, 3)
+
+            L_n = 0.1 * L_novo + 0.9 * L_n
+
+        return round(L_n, 3)
+
     def classificar_perfil_pressao(self, So, k_linha, L_estimado):
         """
-        Classifica o perfil de pressão hidráulica baseado na tese.
+        Classifica o perfil de pressão hidráulica baseado na tese (Pág. 71).
         So: declividade em decimal
         k_linha: constante da linha
         L_estimado: comprimento estimado
@@ -999,7 +1051,7 @@ class CalculadorIrrigacao:
             return 'Perfil Tipo I (Aclive ou Nível)'
 
         J = k_linha * (L_estimado ** 1.75)
-        razao = So / J
+        razao = abs(So) / J
 
         if 0 < razao < 1:
             return 'Perfil Tipo IIa (Declive Fraco)'

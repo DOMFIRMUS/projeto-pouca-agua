@@ -203,6 +203,17 @@ cursor.execute('''
         )
     """)
     cursor.execute('''
+        CREATE TABLE IF NOT EXISTS projeto_hidraulica_lateral (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo_projeto TEXT UNIQUE,
+            k_linha REAL,
+            se_vazao REAL,
+            q_media REAL,
+            lmax_perfil_ii_c REAL,
+            perfil_pressao_tipo TEXT,
+            data_calculo DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
         CREATE TABLE IF NOT EXISTS projeto_hidraulica_derivacao (
             codigo_projeto TEXT PRIMARY KEY,
             declividade_derivacao REAL,
@@ -1044,6 +1055,8 @@ def salvar_perdas_conexoes(codigo_projeto, v_d, d_d, a_p, hfl_d, d_c, l_c, v_c, 
         return False
     finally:
         conn.close()
+
+def insert_projeto_hidraulica_lateral(codigo_projeto, k_linha, se_vazao, q_media, lmax_perfil_ii_c, perfil_pressao_tipo):
             INSERT INTO projeto_perdas_conexoes
             (codigo_projeto, v_d, d_d, a_p, hfl_d, d_c, l_c, v_c, v_l, hfl_l, vilaca_limites_status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1060,6 +1073,21 @@ def salvar_hidraulica_lateral(codigo_projeto, perfil_pressao, lmax, status):
     cursor = conn.cursor()
     try:
         cursor.execute('''
+            INSERT INTO projeto_hidraulica_lateral (
+                codigo_projeto, k_linha, se_vazao, q_media, lmax_perfil_ii_c, perfil_pressao_tipo
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(codigo_projeto) DO UPDATE SET
+                k_linha=excluded.k_linha,
+                se_vazao=excluded.se_vazao,
+                q_media=excluded.q_media,
+                lmax_perfil_ii_c=excluded.lmax_perfil_ii_c,
+                perfil_pressao_tipo=excluded.perfil_pressao_tipo,
+                data_calculo=CURRENT_TIMESTAMP
+        ''', (codigo_projeto, k_linha, se_vazao, q_media, lmax_perfil_ii_c, perfil_pressao_tipo))
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        print(f"Database error in insert_projeto_hidraulica_lateral: {e}")
             INSERT INTO projeto_hidraulica_lateral (codigo_projeto, perfil_pressao_final, lmax_final_calculado, denominador_seguro_status)
             VALUES (?, ?, ?, ?)
             ON CONFLICT(codigo_projeto) DO UPDATE SET
@@ -1075,6 +1103,7 @@ def salvar_hidraulica_lateral(codigo_projeto, perfil_pressao, lmax, status):
     finally:
         conn.close()
 
+def get_projeto_hidraulica_lateral(codigo_projeto):
 def obter_hidraulica_lateral(codigo_projeto):
     conn = get_db_connection()
     cursor = conn.cursor()
