@@ -1422,6 +1422,26 @@ class CalculadorIrrigacao:
 
         return resultado
 
+    def calcular_cad(self, theta_cc, theta_pmp, z):
+        if theta_cc <= theta_pmp or z <= 0:
+            return 0.0
+        return 1000.0 * (theta_cc - theta_pmp) * z
+
+    def calcular_irn_balanco(self, cad, fator_f, pe=0.0, tipo_irrigacao='total'):
+        if tipo_irrigacao == 'total':
+            irn = cad * fator_f
+        elif tipo_irrigacao == 'suplementar':
+            irn = (cad * fator_f) - pe
+        else:
+            irn = cad * fator_f
+
+        return max(0.0, irn)
+
+    def calcular_turno_rega_maximo(self, irn_max, etc):
+        if etc <= 0:
+            return 1
+        tr = int(irn_max / etc)
+        return max(1, tr)
     def validar_limites_conector_zitterell(self, die, dis, lc, dt, vt, reynolds):
         '''
         Validador de Fronteiras de Zitterell (Limites de Validade - Pág. 74)
