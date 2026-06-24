@@ -202,6 +202,21 @@ cursor.execute('''
             profundidade INTEGER
         )
     """)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS projeto_hidraulica_derivacao (
+            codigo_projeto TEXT PRIMARY KEY,
+            declividade_derivacao REAL,
+            pressao_entrada_h REAL,
+            comprimento_total_l REAL,
+            vazao_ql REAL,
+            espacamento_sl REAL,
+            distancia_sl1 REAL,
+            variacao_hvar REAL,
+            estrategia_dimensionamento TEXT,
+            zitterell_faixa_status INTEGER,
+            FOREIGN KEY(codigo_projeto) REFERENCES projetos_metadados(codigo_projeto)
+        )
+    ''')
 
     cursor.execute("PRAGMA table_info(projetos_metadados)")
     columns = [info[1] for info in cursor.fetchall()]
@@ -247,12 +262,6 @@ def update_area_umedecida_projeto(codigo_projeto, rw, dw, pw, tipo_disposicao, c
         SET rw_raio_umedecido = ?, dw_diametro_molhado = ?, pw_area_umedecida = ?,
             tipo_disposicao = ?, configuracao_linha = ?, parametro_alpha = ?, condutividade_ko = ?, profundidade_z = ?
         WHERE codigo_projeto = ?
-    """, (rw, dw, pw, tipo_disposicao, configuracao_linha, parametro_alpha, condutividade_ko, profundidade_z, codigo_projeto))
-    conn.commit()
-    conn.close()
-
-def update_area_sombreada_projeto(codigo_projeto, ps, tipo_calculo, ss_largura_faixa, dco_diametro_copa):
-    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         UPDATE projetos_metadados
@@ -993,6 +1002,9 @@ def salvar_dados_solo_irn(codigo_projeto, theta_cc, theta_pmp, fator_f, cad_calc
     finally:
         conn.close()
 
+def salvar_hidraulica_derivacao(codigo_projeto, declividade_derivacao, pressao_entrada_h,
+                               comprimento_total_l, vazao_ql, espacamento_sl, distancia_sl1,
+                               variacao_hvar, estrategia_dimensionamento, zitterell_faixa_status):
 
 def salvar_perdas_conexoes(codigo_projeto, v_d, d_d, a_p, hfl_d, d_c, l_c, v_c, v_l, hfl_l, limites_status):
     conn = get_db_connection()
@@ -1005,6 +1017,33 @@ def salvar_perdas_conexoes(codigo_projeto, v_d, d_d, a_p, hfl_d, d_c, l_c, v_c, 
 
     try:
         cursor.execute('''
+            INSERT INTO projeto_hidraulica_derivacao (
+                codigo_projeto, declividade_derivacao, pressao_entrada_h, comprimento_total_l,
+                vazao_ql, espacamento_sl, distancia_sl1, variacao_hvar, estrategia_dimensionamento,
+                zitterell_faixa_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(codigo_projeto) DO UPDATE SET
+                declividade_derivacao=excluded.declividade_derivacao,
+                pressao_entrada_h=excluded.pressao_entrada_h,
+                comprimento_total_l=excluded.comprimento_total_l,
+                vazao_ql=excluded.vazao_ql,
+                espacamento_sl=excluded.espacamento_sl,
+                distancia_sl1=excluded.distancia_sl1,
+                variacao_hvar=excluded.variacao_hvar,
+                estrategia_dimensionamento=excluded.estrategia_dimensionamento,
+                zitterell_faixa_status=excluded.zitterell_faixa_status
+        ''', (
+            codigo_projeto, declividade_derivacao, pressao_entrada_h, comprimento_total_l,
+            vazao_ql, espacamento_sl, distancia_sl1, variacao_hvar, estrategia_dimensionamento,
+            zitterell_faixa_status
+        ))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error in salvar_hidraulica_derivacao: {e}")
+        return False
+    finally:
+        conn.close()
             INSERT INTO projeto_perdas_conexoes
             (codigo_projeto, v_d, d_d, a_p, hfl_d, d_c, l_c, v_c, v_l, hfl_l, vilaca_limites_status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

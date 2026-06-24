@@ -1309,6 +1309,45 @@ class CalculadorIrrigacao:
 
         return resultado
 
+    def validar_limites_conector_zitterell(self, die, dis, lc, dt, vt, reynolds):
+        '''
+        Validador de Fronteiras de Zitterell (Limites de Validade - Pág. 74)
+        '''
+        alertas = []
+        if not (2.318 <= die <= 7.900):
+            alertas.append(f"Die fora da faixa: {die} mm")
+        if not (2.318 <= dis <= 12.006):
+            alertas.append(f"Dis fora da faixa: {dis} mm")
+        if not (21.483 <= lc <= 65.046):
+            alertas.append(f"Lc fora da faixa: {lc} mm")
+        if not (4.050 <= dt <= 12.854):
+            alertas.append(f"Dt fora da faixa: {dt} mm")
+        if not (0.363 <= vt <= 7.580):
+            alertas.append(f"Vt fora da faixa: {vt} m/s")
+        if not (2405.599 <= reynolds <= 66670.140):
+            alertas.append(f"Reynolds fora da faixa: {reynolds}")
+
+        return {
+            'valido': len(alertas) == 0,
+            'alertas': alertas
+        }
+
+    def orquestrar_dimensionamento_derivacao(self, declividade, h_pressao, l_comprimento, ql_vazao, sl_espacamento, sl1_distancia, hvar_limite):
+        '''
+        Orquestrador de Topografia da Linha de Derivação (Seção 3.10 - Pág. 74)
+        '''
+        estrategia = 'Método da Divisão em Trechos' if declividade < 0 else 'Critério de Único Diâmetro'
+        return {
+            'entradas': {
+                'declividade_derivacao': declividade,
+                'pressao_entrada_h': h_pressao,
+                'comprimento_total_l': l_comprimento,
+                'vazao_ql': ql_vazao,
+                'espacamento_sl': sl_espacamento,
+                'distancia_sl1': sl1_distancia,
+                'variacao_hvar': hvar_limite
+            },
+            'estrategia_dimensionamento': estrategia
     def calcular_et_consorcio(self, eto, kl, lista_culturas):
         """
         Calcula a Evapotranspiração para Consórcio de Culturas da Agricultura Familiar.
