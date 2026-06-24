@@ -211,17 +211,6 @@ def obter_status():
             "numero_emissores_por_planta": np_emissores,
             "fracao_lixiviacao": fl,
             "irrigacao_total_necessaria_mm": itn
-            "evapotranspiracao_referencia_mm_dia": calc["eto"],
-            "capacidade_agua_disponivel_solo_mm": calc["cad"],
-            "irrigacao_real_necessaria_max_mm": calc["irn_max"],
-            "tempo_irrigacao_horas": calc["ti_horas"],
-            "numero_emissores_por_planta": calc["np_emissores"],
-            "tempo_irrigacao_calculado_minutos": calc["tempo_irrigacao_calculado_minutos"],
-            "fracao_lixiviacao": calc["fl"],
-            "irrigacao_total_necessaria_mm": calc["itn"],
-            "deficit_pressao_vapor_kpa": calc.get("deficit_pressao_vapor_kpa", 0.0)
-            "irrigacao_total_necessaria_mm": calc["itn"]
-            "irrigacao_total_necessaria_mm": calc["itn"],
         }
     }
 
@@ -348,14 +337,16 @@ def perda_carga():
     if not projeto:
         return jsonify({"erro": "Projeto inexistente. Configure os metadados primeiro."}), 404
 
+    if not dados:
+        return jsonify({"erro": "Nenhum dado enviado"}), 400
     try:
         cultura_id = int(dados['cultura_id'])
         estagio_selecionado = str(dados['estagio_selecionado'])
 
         culturas = get_culturas()
         cultura_selecionada = next((c for c in culturas if c['id'] == cultura_id), None)
-    if not dados:
-        return jsonify({"erro": "Nenhum dado enviado"}), 400
+    except (ValueError, KeyError, TypeError):
+        return jsonify({"erro": "Erro parsing json"}), 400
 
     tem_perfil = any(k in dados for k in ['So', 'k_linha', 'L_estimado'])
     # Branch logic based on the incoming JSON payload parameters
@@ -1151,3 +1142,86 @@ def calcular_e_salvar_area_sombreada(codigo_projeto):
 
     except Exception as e:
         return jsonify({'erro': 'Erro interno do servidor', 'detalhes': str(e)}), 500
+
+@app.route('/api/projetos/<string:codigo_projeto>/agricultura-familiar-otimizada', methods=['POST'])
+def otimizar_agricultura_familiar(codigo_projeto):
+    from backend.database import get_projeto_metadados, obter_indicadores_basicos_projeto, salvar_dados_agricultura_familiar
+    from backend.models.irrigacao import CalculadorIrrigacao
+
+    projeto = get_projeto_metadados(codigo_projeto)
+    if not projeto:
+        return jsonify({"erro": "Projeto não encontrado"}), 404
+
+    dados = request.get_json()
+    if not dados:
+        return jsonify({"erro": "Nenhum dado enviado"}), 400
+
+    campos_obrig = ['capacidade_cisterna_l', 'volume_atual_l', 'area_captacao_m2', 'area_horta_m2', 'precipitacao_mm', 'lista_culturas', 'q_bomba_lh']
+    for c in campos_obrig:
+        if c not in dados:
+            return jsonify({"erro": f"O campo {c} é obrigatório"}), 400
+
+    try:
+        capacidade_cisterna_l = float(dados['capacidade_cisterna_l'])
+        volume_atual_l = float(dados['volume_atual_l'])
+        area_captacao_m2 = float(dados['area_captacao_m2'])
+        area_horta_m2 = float(dados['area_horta_m2'])
+        precipitacao_mm = float(dados['precipitacao_mm'])
+        q_bomba_lh = float(dados['q_bomba_lh'])
+        lista_culturas = dados['lista_culturas']
+        lista_setores_vazao_lh = dados.get('lista_setores_vazao_lh', [])
+
+        if area_captacao_m2 <= 0 or area_horta_m2 <= 0:
+            return jsonify({"erro": "Áreas não podem ser nulas ou negativas"}), 400
+
+        if not isinstance(lista_culturas, list):
+            return jsonify({"erro": "lista_culturas deve ser um array de objetos"}), 400
+
+    except (ValueError, TypeError):
+        return jsonify({"erro": "Formato de dados inválido"}), 400
+
+    indicadores = obter_indicadores_basicos_projeto(codigo_projeto)
+    eto = indicadores.get('eto', 4.5)
+    kl = indicadores.get('kl', 1.0)
+    itn = indicadores.get('itn', 5.0)
+
+    calculador = CalculadorIrrigacao()
+
+    etc_consorcio = calculador.calcular_et_consorcio(eto, kl, lista_culturas)
+    kc_consorcio = sum(c.get('kc', 0) * c.get('fracao_area', 0) for c in lista_culturas)
+    kc_consorcio = min(kc_consorcio, 1.30)
+
+    cisterna = calculador.simular_autonomia_cisterna(
+        volume_atual=volume_atual_l,
+        capacidade_max=capacidade_cisterna_l,
+        area_irrigada_m2=area_horta_m2,
+        lamina_itn_mm=itn,
+        precipitacao_mm=precipitacao_mm,
+        area_captacao_m2=area_captacao_m2
+    )
+
+    bomba = calculador.escalonar_setores_familiar(q_bomba_lh, lista_setores_vazao_lh)
+
+    salvo = salvar_dados_agricultura_familiar(
+        codigo_projeto,
+        capacidade_cisterna_l,
+        area_captacao_m2,
+        area_horta_m2,
+        kc_consorcio,
+        etc_consorcio,
+        cisterna['autonomia_dias'],
+        bomba['turnos_bomba']
+    )
+
+    if not salvo:
+        return jsonify({"erro": "Erro ao salvar no banco de dados"}), 500
+
+    return jsonify({
+        "status": "sucesso",
+        "otimizacao": {
+            "etc_consorcio": etc_consorcio,
+            "kc_consorcio": round(kc_consorcio, 2),
+            "cisterna": cisterna,
+            "bomba": bomba
+        }
+    }), 200

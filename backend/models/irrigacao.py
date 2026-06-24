@@ -1155,3 +1155,82 @@ class CalculadorIrrigacao:
                 resultado["alerta"] = "a faixa contínua será rompida"
 
         return resultado
+
+    def calcular_et_consorcio(self, eto, kl, lista_culturas):
+        """
+        Calcula a Evapotranspiração para Consórcio de Culturas da Agricultura Familiar.
+
+        Args:
+            eto (float): Evapotranspiração de Referência (mm/dia).
+            kl (float): Coeficiente de Localização.
+            lista_culturas (list): Lista de dicionários com 'kc' e 'fracao_area'.
+
+        Returns:
+            float: Evapotranspiração do consórcio combinada (mm/dia).
+        """
+        if not lista_culturas:
+            return 0.0
+
+        soma_fracoes = sum(c.get('fracao_area', 0) for c in lista_culturas)
+
+        # Trava de Segurança: Normalização se não somar 1.0 (com tolerância)
+        if abs(soma_fracoes - 1.0) > 0.01:
+            for c in lista_culturas:
+                if soma_fracoes > 0:
+                    c['fracao_area'] = c.get('fracao_area', 0) / soma_fracoes
+                else:
+                    c['fracao_area'] = 1.0 / len(lista_culturas)
+
+        # Calcula Kc consórcio
+        kc_consorcio = sum(c.get('kc', 0) * c.get('fracao_area', 0) for c in lista_culturas)
+
+        # Clampeia ao máximo de 1.30
+        kc_consorcio = min(kc_consorcio, 1.30)
+
+        # ETc combinada localizada
+        etc_consorcio = eto * kc_consorcio * kl
+
+        return round(etc_consorcio, 3)
+
+    def simular_autonomia_cisterna(self, volume_atual, capacidade_max, area_irrigada_m2, lamina_itn_mm, precipitacao_mm, area_captacao_m2, coeficiente_escoamento=0.90):
+        """
+        Simulador Dinâmico de Autonomia de Cisterna.
+        """
+        import math
+        volume_entrada = precipitacao_mm * area_captacao_m2 * coeficiente_escoamento
+        volume_saida = lamina_itn_mm * area_irrigada_m2
+
+        volume_final = volume_atual + volume_entrada - volume_saida
+
+        # Trava física
+        volume_final = max(0.0, min(volume_final, capacidade_max))
+
+        if volume_saida <= 0:
+            autonomia_dias = 999.0
+        else:
+            autonomia_dias = volume_final / volume_saida
+
+        return {
+            "volume_final_l": round(volume_final, 2),
+            "autonomia_dias": round(autonomia_dias, 1)
+        }
+
+    def escalonar_setores_familiar(self, q_bomba_lh, lista_setores_vazao_lh):
+        """
+        Orquestrador de Escalonamento de Pequenas Bombas.
+        """
+        import math
+        vazao_total = sum(lista_setores_vazao_lh)
+
+        if vazao_total <= 0 or q_bomba_lh <= 0:
+            return {"turnos_bomba": 0, "vazao_total_lh": vazao_total}
+
+        if vazao_total <= q_bomba_lh:
+            turnos = 1
+        else:
+            turnos = math.ceil(vazao_total / q_bomba_lh)
+
+        return {
+            "turnos_bomba": turnos,
+            "vazao_total_lh": round(vazao_total, 2)
+        }
