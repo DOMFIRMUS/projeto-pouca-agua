@@ -1155,3 +1155,90 @@ class CalculadorIrrigacao:
                 resultado["alerta"] = "a faixa contínua será rompida"
 
         return resultado
+
+
+    def calcular_hf_derivacao_p75(self, q_vazao, d_interno, l_comprimento, lambda_fator=1.0, f_atrito=0.02):
+        """
+        Calcula a perda de carga em trechos da linha de derivacao (Eq. 73, Pag. 75).
+        Q em m3/s, D e L em metros.
+        """
+        if d_interno <= 0:
+            return 0.0
+
+        # Conversoes defensivas
+        # Se Q vier em L/h, seria um valor muito grande. Assumindo que a API deve passar em m3/s,
+        # mas se houver conversao implicita exigida:
+        # A instrucao diz: "Se a API receber Q em L/h ou D em milímetros, converta-os internamente"
+        # Vou checar se Q > 1 para inferir se esta em L/h, senao deixo. O ideal eh ser estrito
+        # com os tipos mas vamos tentar converter.
+        # Melhor verificar a magnitude ou os parametros.
+
+        # Na verdade, a instrucao diz: "Se a API receber Q em L/h ou D em milímetros, converta-os internamente antes de aplicar as potências."
+        # Como nao temos metadados fortes de tipo, o melhor eh aplicar L/h -> m3/s se vazao > 1 e assumir D em mm se D > 1.
+        # Mas para ser rigoroso, eh melhor verificar:
+        q_m3s = q_vazao
+        if q_vazao > 1.0: # Assumindo L/h (1 m3/s eh muita agua para derivacao comum)
+            q_m3s = q_vazao / 3600000.0
+
+        d_m = d_interno
+        if d_interno > 1.0: # Assumindo mm
+            d_m = d_interno / 1000.0
+
+        hf = 8.263e-2 * lambda_fator * f_atrito * ((q_m3s**2) / (d_m**5)) * l_comprimento
+        return hf
+
+    def calcular_diametro_teorico_derivacao(self, q_vazao, hf_target, l_comprimento, f_atrito=0.02, lambda_fator=1.0):
+        """
+        Calcula o diametro teorico de um trecho da linha de derivacao (Eq. 74, Pag. 75).
+        """
+        if hf_target <= 0:
+            hf_target = 0.001
+
+        q_m3s = q_vazao
+        if q_vazao > 1.0:
+            q_m3s = q_vazao / 3600000.0
+
+        # D = ((8.263e-2 * f * Q^2 / hf) * L) ^ 0.2
+        d_teorico = ((8.263e-2 * f_atrito * lambda_fator * (q_m3s**2) / hf_target) * l_comprimento) ** 0.2
+        return d_teorico
+
+    def selecionar_melhor_diametro_comercial(self, d_teorico, lista_comerciais, q_vazao, l_comprimento, delta_z, lambda_fator=1.0, f_atrito=0.02):
+        """
+        Seleciona o diametro comercial que minimiza o erro abs(hf - delta_z).
+        """
+        if not lista_comerciais:
+            raise ValueError("lista_comerciais nao pode ser vazia")
+
+        lista_ordenada = sorted(lista_comerciais)
+
+        # Encontra diametro imediatamente inferior e superior
+        d_inf = lista_ordenada[0]
+        d_sup = lista_ordenada[-1]
+
+        for d in lista_ordenada:
+            if d <= d_teorico:
+                d_inf = d
+            if d >= d_teorico:
+                d_sup = d
+                break
+
+        # Calcula perda de carga para os dois
+        hf_inf = self.calcular_hf_derivacao_p75(q_vazao, d_inf, l_comprimento, lambda_fator, f_atrito)
+        hf_sup = self.calcular_hf_derivacao_p75(q_vazao, d_sup, l_comprimento, lambda_fator, f_atrito)
+
+        # Criterio do Modulo Minimo
+        diff_inf = abs(delta_z - hf_inf)
+        diff_sup = abs(delta_z - hf_sup)
+
+        if diff_inf < diff_sup:
+            return d_inf, hf_inf
+        else:
+            return d_sup, hf_sup
+
+    def calcular_pressao_trecho_seguinte(self, h_anterior, hf_trecho, delta_z):
+        """
+        Calcula a pressao de entrada do proximo trecho (Eq. 75, Pag. 75).
+        H1 = H0 - hf1 + deltaZ1
+        """
+        h_seguinte = h_anterior - hf_trecho + delta_z
+        return round(h_seguinte, 4)
