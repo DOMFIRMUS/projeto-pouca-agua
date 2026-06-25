@@ -3,6 +3,42 @@ import datetime
 
 class CalculadorIrrigacao:
 
+    def calcular_fator_atrito_p66(self, reynolds_r):
+        """
+        Calcula o fator de atrito (f) com base nas equações 48 e 49 (Página 66 da tese).
+        """
+        if reynolds_r <= 0:
+            return 0.0
+
+        if reynolds_r < 2000:
+            f = 64.0 / reynolds_r
+        elif 2000 <= reynolds_r <= 3000:
+            f = 0.04
+        else:
+            f = 0.316 / (reynolds_r ** 0.25)
+
+        return round(f, 4)
+
+    def calcular_perda_carga_lateral_hf(self, vazao_q, diametro_d, comprimento_l, lambda_fator=1.0):
+        """
+        Calcula a perda de carga contínua na linha lateral (Equação 50 - Pág. 66).
+        """
+        if diametro_d <= 0 or comprimento_l < 0:
+            return 0.0
+
+        q_calc = vazao_q
+        if vazao_q >= 1.0:
+            q_calc = vazao_q / 1000.0
+
+        d_calc = diametro_d
+        if diametro_d >= 1.0:
+            d_calc = diametro_d / 1000.0
+
+        hf = 2.8287e-4 * (q_calc ** 1.75) * (d_calc ** -4.75) * comprimento_l * lambda_fator
+
+        return round(hf, 3)
+
+
     def definir_kc_por_estagio(self, kc_inicial, kc_media, kc_final, estagio):
         if estagio == 'inicial':
             return kc_inicial

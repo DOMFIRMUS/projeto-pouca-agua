@@ -11,8 +11,6 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS historico_leitura (
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS historico_leitura (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,11 +25,8 @@ def init_db():
             irn_calculada REAL,
             comprimento_lateral_m REAL,
             perda_carga_total_mca REAL,
-            codigo_projeto TEXT,
             data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """)
-    cursor.execute("""
     ''')
     cursor.execute("PRAGMA table_info(historico_leitura)")
     columns = [info[1] for info in cursor.fetchall()]
@@ -63,8 +58,6 @@ def init_db():
     ''')
 
     # Unified projetos_metadados schema incorporating all fields and the new audit fields for Ps
-    cursor.execute('''
-    """)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS projetos_metadados (
             codigo_projeto TEXT PRIMARY KEY UNIQUE,
@@ -76,7 +69,6 @@ def init_db():
             area_total_irrigada REAL,
             area_subunidade REAL,
             data_elaboracao TEXT,
-            identificacao TEXT,
             nome_codigo_subunidade TEXT,
             largura INTEGER,
             altura INTEGER,
@@ -85,10 +77,6 @@ def init_db():
             ss_largura_faixa REAL,
             dco_diametro_copa REAL,
             ps_calculado REAL
-            identificacao TEXT,
-            nome_codigo_subunidade TEXT,
-            area_total_irrigada REAL,
-            area_subunidade REAL,
             data_elaboracao TEXT,
             cultura_id INTEGER,
             estagio_selecionado TEXT CHECK(estagio_selecionado IN ('inicial', 'meia_estacao', 'final')),
@@ -96,11 +84,6 @@ def init_db():
             configuracao_linha TEXT,
             parametro_alpha REAL,
             condutividade_ko REAL,
-            profundidade_z REAL,
-            tipo_calculo TEXT,
-            ss_largura_faixa REAL,
-            dco_diametro_copa REAL,
-            rw_raio_umedecido REAL,
             dw_diametro_molhado REAL,
             pw_area_umedecida REAL,
             ps_area_sombreada REAL,
@@ -152,10 +135,13 @@ def update_area_sombreada_projeto(codigo_projeto, ps, tipo_calculo, ss_largura_f
     conn.close()
 
 
-            codigo_subunidade TEXT,
-            area_total_irrigada REAL,
-            area_subunidade REAL,
-            data_elaboracao TEXT
+
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS bancos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            taxa_mensal REAL NOT NULL
         )
     ''')
 
@@ -178,8 +164,6 @@ def update_area_sombreada_projeto(codigo_projeto, ps, tipo_calculo, ss_largura_f
     conn.commit()
     conn.close()
 
-def insert_projeto(dados):
-def insert_projeto(codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao):
 def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, profundidade):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -202,12 +186,12 @@ def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, prof
             data_elaboracao
         ))
         row_id = cursor.lastrowid
-        cursor.execute('''
+        cursor.execute("""
             INSERT INTO projetos_metadados (
                 codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario,
                 nome_projetista, codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
+        """, (
             dados.get('codigo_projeto'),
             dados.get('nome_projeto'),
             dados.get('nome_propriedade'),
@@ -235,14 +219,6 @@ def get_projeto_metadados(codigo_projeto):
     if row:
         return dict(row)
     return None
-
-def seed_culturas():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT COUNT(*) FROM culturas')
-    count = cursor.fetchone()[0]
-    if count == 0:
-        culturas = [
 
 def seed_culturas():
     conn = get_db_connection()
@@ -357,37 +333,17 @@ def seed_culturas():
         ('Nabo', 0.50, 1.10, 0.95, '2023-09-01', 20, 60, 20),
         ('Beterraba sacarina', 0.35, 1.20, 0.70, '2023-09-01', 20, 60, 20)
     ]
-    cursor.executemany('''
-        INSERT OR IGNORE INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', culturas)
+    cursor.executemany("""
+        INSERT OR IGNORE INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1.0, 3.0)
+    """, culturas)
     conn.commit()
-    if count == 0:
-        culturas = [
-            ('Algodoeiro', 0.35, 1.20, 0.60, '2023-10-01', 30, 50, 40, 7.7, 27.0),
-            ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.7, 10.0),
-            ('Tomate', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 2.5, 12.5),
-            ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.3, 4.0),
-            ('Cebola', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.2, 7.2),
-            ('Tomate tutorado', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 1.0, 3.0),
-            ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.0, 3.0),
-            ('Batata', 0.50, 1.15, 0.75, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-            ('Cebola seca', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.0, 3.0),
-            ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.0, 3.0),
-            ('Melancia', 0.40, 1.00, 0.75, '2023-09-05', 20, 30, 20, 1.0, 3.0)
-        ]
-        cursor.executemany("""
-            INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, culturas)
-        conn.commit()
-        cursor.executemany('''
     for cultura in culturas:
-        cursor.execute('''
+        cursor.execute("""
             INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce)
-            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?, 1.0, 3.0
             WHERE NOT EXISTS (SELECT 1 FROM culturas WHERE nome = ?)
-        ''', cultura + (cultura[0],))
+        """, cultura + (cultura[0],))
 
     conn.commit()
     conn.close()
@@ -412,7 +368,6 @@ def insert_cultura(nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase
     conn.close()
     return row_id
 
-def insert_leitura(umidade, temperatura_max, temperatura_min, eto_calculada=0.0, cad_calculada=0.0, irn_calculada=0.0, comprimento_lateral_m=0.0, perda_carga_total_mca=0.0, codigo_projeto=None):
 def delete_banco(banco_id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -424,12 +379,12 @@ def insert_projeto(dados):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute('''
+        cursor.execute("""
             INSERT INTO projetos_metadados (
                 codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario,
                 nome_projetista, codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
+        """, (
             dados.get('codigo_projeto'),
             dados.get('nome_projeto'),
             dados.get('nome_propriedade'),
@@ -508,14 +463,14 @@ def salvar_dados_area_sombreada(codigo_projeto, tipo_calculo, ss_largura, dco_di
         return False
 
     try:
-        cursor.execute('''
+        cursor.execute("""
             UPDATE projetos_metadados
             SET tipo_calculo_ps = ?,
                 ss_largura_faixa = ?,
                 dco_diametro_copa = ?,
                 ps_calculado = ?
             WHERE codigo_projeto = ?
-        ''', (tipo_calculo, ss_largura, dco_diametro, ps_calculado, codigo_projeto))
+        """, (tipo_calculo, ss_largura, dco_diametro, ps_calculado, codigo_projeto))
         conn.commit()
         return True
     except sqlite3.Error as e:
@@ -537,11 +492,11 @@ def obter_projeto_por_codigo(codigo_projeto):
 def obter_resumo_hidraulico(codigo_projeto):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute("""
         SELECT * FROM historico_leitura
         WHERE codigo_projeto = ?
         ORDER BY id DESC LIMIT 1
-    ''', (codigo_projeto,))
+    """, (codigo_projeto,))
     row = cursor.fetchone()
     conn.close()
     if row:
@@ -552,12 +507,12 @@ def insert_projeto(dados):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute('''
+        cursor.execute("""
             INSERT INTO projetos_metadados (
                 codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario,
                 nome_projetista, codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
+        """, (
             dados.get('codigo_projeto'),
             dados.get('nome_projeto'),
             dados.get('nome_propriedade'),
@@ -574,3 +529,10 @@ def insert_projeto(dados):
         return False
     finally:
         conn.close()
+
+def get_bancos():
+    return []
+def insert_banco(nome, taxa):
+    pass
+def delete_banco(id):
+    pass
