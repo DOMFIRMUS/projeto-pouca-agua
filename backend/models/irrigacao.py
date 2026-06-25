@@ -1155,3 +1155,62 @@ class CalculadorIrrigacao:
                 resultado["alerta"] = "a faixa contínua será rompida"
 
         return resultado
+
+
+
+    def calcular_constante_psicrometrica_gamma(self, pressao_p):
+        gamma = 0.665 * 1e-3 * float(pressao_p)
+        return round(gamma, 5)
+
+    def calcular_diametro_dw_schwartzman(self, z, q, ko):
+        if float(ko) <= 0: return 0.0
+        dw = 1.32 * (float(z) ** 0.35) * ((float(q) / float(ko)) ** 0.33)
+        return round(dw, 3)
+
+    def calcular_raio_rw(self, alpha, q, ko):
+        import math
+        if float(alpha) <= 0 or float(ko) <= 0: return 0.0
+        termo1 = 4.0 / ((float(alpha) ** 2) * (math.pi ** 2))
+        termo2 = float(q) / (math.pi * float(ko))
+        rw = math.sqrt(termo1 + termo2) - (2.0 / (float(alpha) * math.pi))
+        return round(max(0.0, rw), 3)
+
+    def calcular_area_umedecida_fluxograma(self, tipo_disposicao, configuracao_linha, params):
+        import math
+        sp = float(params.get("sp", 1.0))
+        sr = float(params.get("sr", 1.0))
+        dw = float(params.get("dw", 0.0))
+        rw = float(params.get("rw", 0.0))
+        np_val = float(params.get("np", 1.0))
+
+        ap = sp * float(sr)
+        if ap <= 0:
+            return {"dw": dw, "rw": rw, "aw": 0.0, "ap": ap, "pw": 0.0, "dentro_do_criterio": False}
+
+        if tipo_disposicao == 'faixa_continua':
+            if configuracao_linha == 'LLS':
+                aw = dw * sp
+            elif configuracao_linha == 'LLD':
+                aw = 2.0 * dw * sp
+            else:
+                aw = 0.0
+        elif tipo_disposicao == 'por_arvore':
+            aw = np_val * math.pi * (rw ** 2)
+        else:
+            aw = 0.0
+
+        pw = (aw / ap) * 100.0 if ap > 0 else 0.0
+        pw_final = max(0.0, min(100.0, pw))
+        dentro = 30.0 < pw_final < 60.0
+
+        return {"dw": dw, "rw": rw, "aw": round(aw, 2), "ap": round(ap, 2), "pw": round(pw_final, 2), "dentro_do_criterio": dentro}
+
+    def ajustar_fator_f_dinamico(self, f_tab, etc):
+        f = float(f_tab) + 0.04 * (5.0 - float(etc))
+        f_final = max(0.1, min(0.9, f))
+        return round(f_final, 3)
+
+    def calcular_irn_max_localizada(self, cad, f_ajustado, pw_valor):
+        fw = float(pw_valor) / 100.0
+        irn_max = float(cad) * float(f_ajustado) * fw
+        return round(irn_max, 2)

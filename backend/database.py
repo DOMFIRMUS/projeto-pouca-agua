@@ -13,8 +13,6 @@ def init_db():
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS historico_leitura (
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS historico_leitura (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             codigo_projeto TEXT,
             umidade REAL,
@@ -26,19 +24,18 @@ def init_db():
             cad_calculada REAL,
             irn_calculada REAL,
             comprimento_lateral_m REAL,
-            perda_carga_total_mca REAL,
-            codigo_projeto TEXT,
+            perda_carga_total_mca REAL
             data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     cursor.execute("""
-    ''')
+    """)
     cursor.execute("PRAGMA table_info(historico_leitura)")
     columns = [info[1] for info in cursor.fetchall()]
     if 'codigo_projeto' not in columns:
         cursor.execute('ALTER TABLE historico_leitura ADD COLUMN codigo_projeto TEXT')
 
-    cursor.execute('''
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS culturas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT,
@@ -50,20 +47,21 @@ def init_db():
             dias_meia_estacao INTEGER,
             dias_fase_final INTEGER,
             min_ce REAL DEFAULT 1.0,
-            max_ce REAL DEFAULT 3.0
+            max_ce REAL DEFAULT 3.0,
+            f_tab REAL
         )
-    ''')
+    """)
 
-    cursor.execute('''
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS bancos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT NOT NULL,
             taxa_mensal REAL NOT NULL
         )
-    ''')
+    """)
 
     # Unified projetos_metadados schema incorporating all fields and the new audit fields for Ps
-    cursor.execute('''
+    cursor.execute("""
     """)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS projetos_metadados (
@@ -84,12 +82,7 @@ def init_db():
             tipo_calculo_ps TEXT CHECK(tipo_calculo_ps IN ('faixa_sombreada', 'diametro_copa', NULL)),
             ss_largura_faixa REAL,
             dco_diametro_copa REAL,
-            ps_calculado REAL
-            identificacao TEXT,
-            nome_codigo_subunidade TEXT,
-            area_total_irrigada REAL,
-            area_subunidade REAL,
-            data_elaboracao TEXT,
+            ps_calculado REAL,
             cultura_id INTEGER,
             estagio_selecionado TEXT CHECK(estagio_selecionado IN ('inicial', 'meia_estacao', 'final')),
             tipo_disposicao TEXT,
@@ -98,8 +91,6 @@ def init_db():
             condutividade_ko REAL,
             profundidade_z REAL,
             tipo_calculo TEXT,
-            ss_largura_faixa REAL,
-            dco_diametro_copa REAL,
             rw_raio_umedecido REAL,
             dw_diametro_molhado REAL,
             pw_area_umedecida REAL,
@@ -114,6 +105,22 @@ def init_db():
             taxa_mensal REAL NOT NULL
         )
     """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS projeto_microirrigacao (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo_projeto TEXT NOT NULL,
+            configuracao_linha TEXT,
+            tipo_disposicao TEXT,
+            condutividade_ko REAL,
+            parametro_alpha REAL,
+            vazao_q REAL,
+            f_ajustado REAL,
+            irn_max_calculada REAL,
+            FOREIGN KEY (codigo_projeto) REFERENCES projetos_metadados(codigo_projeto)
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -152,12 +159,7 @@ def update_area_sombreada_projeto(codigo_projeto, ps, tipo_calculo, ss_largura_f
     conn.close()
 
 
-            codigo_subunidade TEXT,
-            area_total_irrigada REAL,
-            area_subunidade REAL,
-            data_elaboracao TEXT
-        )
-    ''')
+
 
     # Try to add missing columns in case the table already exists
     cursor.execute("PRAGMA table_info(projetos_metadados)")
@@ -178,8 +180,6 @@ def update_area_sombreada_projeto(codigo_projeto, ps, tipo_calculo, ss_largura_f
     conn.commit()
     conn.close()
 
-def insert_projeto(dados):
-def insert_projeto(codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao):
 def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, profundidade):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -202,12 +202,12 @@ def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, prof
             data_elaboracao
         ))
         row_id = cursor.lastrowid
-        cursor.execute('''
+        cursor.execute("""
             INSERT INTO projetos_metadados (
                 codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario,
                 nome_projetista, codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
+        """, (
             dados.get('codigo_projeto'),
             dados.get('nome_projeto'),
             dados.get('nome_propriedade'),
@@ -239,155 +239,142 @@ def get_projeto_metadados(codigo_projeto):
 def seed_culturas():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT COUNT(*) FROM culturas')
-    count = cursor.fetchone()[0]
-    if count == 0:
-        culturas = [
-
-def seed_culturas():
-    conn = get_db_connection()
-    cursor = conn.cursor()
 
     culturas = [
-        ('Algodoeiro', 0.35, 1.20, 0.60, '2023-10-01', 30, 50, 40, 7.7, 27.0),
-        ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.7, 10.0),
-        ('Tomate', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 2.5, 12.5),
-        ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.3, 4.0),
-        ('Cebola', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.2, 7.2),
-        ('Tomate tutorado', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 1.0, 3.0),
-        ('Batata', 0.50, 1.15, 0.75, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Cebola seca', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.0, 3.0),
-        ('Melancia', 0.40, 1.00, 0.75, '2023-09-05', 20, 30, 20, 1.0, 3.0),
-        ('Melão', 0.50, 1.05, 0.75, '2023-09-05', 20, 30, 20, 1.0, 3.0),
-        ('Pepino', 0.60, 1.15, 0.75, '2023-09-05', 20, 30, 20, 1.0, 3.0),
-        ('Batata doce', 0.50, 1.15, 0.65, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Beterraba', 0.50, 1.05, 0.95, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Mandioca – ano 1', 0.30, 0.80, 0.30, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Mandioca – ano 2', 0.30, 1.10, 0.50, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Amendoim', 0.40, 1.15, 0.60, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Ervilha fresca', 0.50, 1.15, 1.10, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Ervilha seca', 0.50, 1.15, 0.30, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Feijão seco', 0.40, 1.15, 0.35, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Feijão verde', 0.50, 1.05, 0.90, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Lentilha', 0.40, 1.10, 0.30, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Soja', 0.50, 1.15, 0.50, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Alcachofra', 0.50, 1.00, 0.95, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Aspargo', 0.50, 0.95, 0.30, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Hortelã', 0.60, 1.15, 1.10, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Morango', 0.40, 0.85, 0.75, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-        ('Algodão', 0.35, 1.15, 0.50, '2023-10-01', 30, 50, 40, 1.0, 3.0),
-        ('Linho', 0.35, 1.10, 0.25, '2023-10-01', 30, 50, 40, 1.0, 3.0),
-        ('Sisal com estresse', 0.35, 0.40, 0.40, '2023-10-01', 30, 50, 40, 1.0, 3.0),
-        ('Sisal sem estresse', 0.35, 0.70, 0.70, '2023-10-01', 30, 50, 40, 1.0, 3.0),
-        ('Canola', 0.35, 1.15, 0.35, '2023-10-01', 30, 50, 40, 1.0, 3.0),
-        ('Gergelim', 0.35, 1.10, 0.25, '2023-10-01', 30, 50, 40, 1.0, 3.0),
-        ('Girassol', 0.35, 1.15, 0.35, '2023-10-01', 30, 50, 40, 1.0, 3.0),
-        ('Mamona', 0.35, 1.15, 0.55, '2023-10-01', 30, 50, 40, 1.0, 3.0),
-        ('Arroz', 1.05, 1.20, 0.90, '2023-07-01', 20, 35, 30, 1.0, 3.0),
-        ('Aveia', 0.30, 1.15, 0.25, '2023-07-01', 20, 35, 30, 1.0, 3.0),
-        ('Cevada', 0.30, 1.15, 0.25, '2023-07-01', 20, 35, 30, 1.0, 3.0),
-        ('Milho doce', 0.30, 1.15, 1.05, '2023-07-01', 20, 35, 30, 1.0, 3.0),
-        ('Painço', 0.30, 1.00, 0.30, '2023-07-01', 20, 35, 30, 1.0, 3.0),
-        ('Sorgo-grão', 0.30, 1.00, 0.55, '2023-07-01', 20, 35, 30, 1.0, 3.0),
-        ('Trigo (Primavera)', 0.30, 1.15, 0.25, '2023-07-01', 20, 35, 30, 1.0, 3.0)
+        ('Algodoeiro', 0.35, 1.20, 0.60, '2023-10-01', 30, 50, 40, 7.7, 27.0, 0.65),
+        ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.7, 10.0, 0.5),
+        ('Tomate', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 2.5, 12.5, 0.4),
+        ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.3, 4.0, 0.3),
+        ('Cebola', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.2, 7.2, 0.5),
+        ('Tomate tutorado', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 1.0, 3.0, 0.4),
+        ('Batata', 0.50, 1.15, 0.75, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5),
+        ('Cebola seca', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.0, 3.0, 0.5),
+        ('Melancia', 0.40, 1.00, 0.75, '2023-09-05', 20, 30, 20, 1.0, 3.0, 0.4),
+        ('Melão', 0.50, 1.05, 0.75, '2023-09-05', 20, 30, 20, 1.0, 3.0, 0.5),
+        ('Pepino', 0.60, 1.15, 0.75, '2023-09-05', 20, 30, 20, 1.0, 3.0, 0.5),
+        ('Batata doce', 0.50, 1.15, 0.65, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5),
+        ('Beterraba', 0.50, 1.05, 0.95, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5),
+        ('Mandioca – ano 1', 0.30, 0.80, 0.30, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5),
+        ('Mandioca – ano 2', 0.30, 1.10, 0.50, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5),
+        ('Amendoim', 0.40, 1.15, 0.60, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5),
+        ('Ervilha fresca', 0.50, 1.15, 1.10, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5),
+        ('Ervilha seca', 0.50, 1.15, 0.30, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5),
+        ('Feijão seco', 0.40, 1.15, 0.35, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5),
+        ('Feijão verde', 0.50, 1.05, 0.90, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5),
+        ('Lentilha', 0.40, 1.10, 0.30, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5),
+        ('Soja', 0.50, 1.15, 0.50, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5, 0.5),
+        ('Alcachofra', 0.50, 1.00, 0.95, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5, 0.5),
+        ('Aspargo', 0.50, 0.95, 0.30, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5, 0.5),
+        ('Hortelã', 0.60, 1.15, 1.10, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5, 0.5),
+        ('Morango', 0.40, 0.85, 0.75, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5, 0.5),
+        ('Algodão', 0.35, 1.15, 0.50, '2023-10-01', 30, 50, 40, 1.0, 3.0, 0.65, 0.65),
+        ('Linho', 0.35, 1.10, 0.25, '2023-10-01', 30, 50, 40, 1.0, 3.0, 0.5, 0.5),
+        ('Sisal com estresse', 0.35, 0.40, 0.40, '2023-10-01', 30, 50, 40, 1.0, 3.0, 0.5, 0.5),
+        ('Sisal sem estresse', 0.35, 0.70, 0.70, '2023-10-01', 30, 50, 40, 1.0, 3.0, 0.5, 0.5),
+        ('Canola', 0.35, 1.15, 0.35, '2023-10-01', 30, 50, 40, 1.0, 3.0, 0.5, 0.5),
+        ('Gergelim', 0.35, 1.10, 0.25, '2023-10-01', 30, 50, 40, 1.0, 3.0, 0.5, 0.5),
+        ('Girassol', 0.35, 1.15, 0.35, '2023-10-01', 30, 50, 40, 1.0, 3.0, 0.5, 0.5),
+        ('Mamona', 0.35, 1.15, 0.55, '2023-10-01', 30, 50, 40, 1.0, 3.0, 0.5, 0.5),
+        ('Arroz', 1.05, 1.20, 0.90, '2023-07-01', 20, 35, 30, 1.0, 3.0, 0.5, 0.5),
+        ('Aveia', 0.30, 1.15, 0.25, '2023-07-01', 20, 35, 30, 1.0, 3.0, 0.5, 0.5),
+        ('Cevada', 0.30, 1.15, 0.25, '2023-07-01', 20, 35, 30, 1.0, 3.0, 0.5, 0.5),
+        ('Milho doce', 0.30, 1.15, 1.05, '2023-07-01', 20, 35, 30, 1.0, 3.0, 0.5, 0.5),
+        ('Painço', 0.30, 1.00, 0.30, '2023-07-01', 20, 35, 30, 1.0, 3.0, 0.5, 0.5),
+        ('Sorgo-grão', 0.30, 1.00, 0.55, '2023-07-01', 20, 35, 30, 1.0, 3.0, 0.5, 0.5),
+        ('Trigo (Primavera, 0.5)', 0.30, 1.15, 0.25, '2023-07-01', 20, 35, 30, 1.0, 3.0, 0.5)
     ]
 
 
     cursor.execute('SELECT COUNT(*) FROM culturas')
     count = cursor.fetchone()[0]
 
-    if count == 0:
-        for cultura in culturas:
-            cursor.execute('''
-                INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce)
-                SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-                WHERE NOT EXISTS (SELECT 1 FROM culturas WHERE nome = ?)
-            ''', cultura + (cultura[0],))
+
 
     culturas = [
-        ('Melancia', 0.40, 1.00, 0.75, '2023-09-01', 20, 50, 20),
-        ('Melão', 0.50, 1.05, 0.75, '2023-09-01', 25, 60, 20),
-        ('Pepino', 0.60, 1.15, 0.75, '2023-09-01', 20, 50, 15),
-        ('Batata', 0.50, 1.15, 0.75, '2023-09-01', 25, 65, 30),
-        ('Batata doce', 0.50, 1.15, 0.65, '2023-09-01', 20, 65, 35),
-        ('Beterraba', 0.50, 1.05, 0.95, '2023-09-01', 20, 50, 30),
-        ('Mandioca - ano 1', 0.30, 0.80, 0.30, '2023-09-01', 20, 90, 30),
-        ('Mandioca - ano 2', 0.30, 1.10, 0.50, '2023-09-01', 20, 120, 40),
-        ('Amendoim', 0.40, 1.15, 0.60, '2023-09-01', 25, 75, 30),
-        ('Ervilha fresca', 0.50, 1.15, 1.10, '2023-09-01', 20, 55, 15),
-        ('Ervilha seca', 0.50, 1.15, 0.30, '2023-09-01', 20, 55, 25),
-        ('Feijão seco', 0.40, 1.15, 0.35, '2023-09-01', 15, 65, 25),
-        ('Feijão verde', 0.50, 1.05, 0.90, '2023-09-01', 15, 45, 15),
-        ('Lentilha', 0.40, 1.10, 0.30, '2023-09-01', 20, 60, 20),
-        ('Soja', 0.50, 1.15, 0.50, '2023-09-01', 20, 70, 25),
-        ('Alcachofra', 0.50, 1.00, 0.95, '2023-09-01', 30, 100, 20),
-        ('Aspargo', 0.50, 0.95, 0.30, '2023-09-01', 30, 120, 30),
-        ('Hortelã', 0.60, 1.15, 1.10, '2023-09-01', 20, 60, 15),
-        ('Morango', 0.40, 0.85, 0.75, '2023-09-01', 20, 60, 20),
-        ('Algodão', 0.35, 1.15, 0.50, '2023-09-01', 30, 90, 30),
-        ('Linho', 0.35, 1.10, 0.25, '2023-09-01', 25, 70, 25),
-        ('Milho', 0.30, 1.20, 0.35, '2023-09-01', 20, 65, 30),
-        ('Trigo (Primavera)', 0.30, 1.15, 0.25, '2023-09-01', 20, 60, 30),
-        ('Sisal', 0.40, 1.05, 0.75, '2023-09-01', 30, 90, 30),
-        ('Canola', 0.35, 1.15, 0.35, '2023-09-01', 20, 60, 20),
-        ('Gergelim', 0.35, 1.10, 0.25, '2023-09-01', 20, 60, 20),
-        ('Girassol', 0.35, 1.15, 0.35, '2023-09-01', 25, 70, 25),
-        ('Mamona', 0.35, 1.15, 0.55, '2023-09-01', 30, 80, 30),
-        ('Arroz', 1.05, 1.20, 0.90, '2023-09-01', 30, 60, 30),
-        ('Aveia', 0.30, 1.15, 0.25, '2023-09-01', 20, 60, 25),
-        ('Cevada', 0.30, 1.15, 0.25, '2023-09-01', 20, 60, 25),
-        ('Milho doce', 0.30, 1.15, 1.05, '2023-09-01', 20, 50, 20),
-        ('Painço', 0.30, 1.00, 0.30, '2023-09-01', 15, 50, 15),
-        ('Sorgo-grão', 0.30, 1.10, 0.55, '2023-09-01', 20, 60, 20),
-        ('Cenoura', 0.70, 1.05, 0.95, '2023-09-01', 20, 60, 20),
-        ('Repolho', 0.70, 1.05, 0.95, '2023-09-01', 20, 60, 20),
-        ('Aipo', 0.70, 1.05, 0.95, '2023-09-01', 20, 60, 20),
-        ('Alho', 0.70, 1.00, 0.70, '2023-09-01', 20, 60, 20),
-        ('Alface', 0.70, 1.00, 0.95, '2023-09-01', 20, 60, 20),
-        ('Cebola seca', 0.70, 1.05, 0.75, '2023-09-01', 20, 60, 20),
-        ('Cebolinha', 0.70, 1.00, 1.00, '2023-09-01', 20, 60, 20),
-        ('Espinafre', 0.70, 1.00, 0.95, '2023-09-01', 20, 60, 20),
-        ('Rabanete', 0.70, 0.90, 0.85, '2023-09-01', 20, 60, 20),
-        ('Berinjela', 0.60, 1.05, 0.90, '2023-09-01', 20, 60, 20),
-        ('Pimentão', 0.60, 1.05, 0.90, '2023-09-01', 20, 60, 20),
-        ('Tomate', 0.60, 1.15, 0.80, '2023-09-01', 20, 60, 20),
-        ('Abóbora', 0.50, 1.00, 0.80, '2023-09-01', 20, 60, 20),
-        ('Abobrinha', 0.50, 0.95, 0.75, '2023-09-01', 20, 60, 20),
-        ('Pastinaca', 0.50, 1.05, 0.95, '2023-09-01', 20, 60, 20),
-        ('Nabo', 0.50, 1.10, 0.95, '2023-09-01', 20, 60, 20),
-        ('Beterraba sacarina', 0.35, 1.20, 0.70, '2023-09-01', 20, 60, 20)
+        ('Melancia', 0.40, 1.00, 0.75, '2023-09-01', 20, 50, 20, 0.4, 0.4),
+        ('Melão', 0.50, 1.05, 0.75, '2023-09-01', 25, 60, 20, 0.5, 0.5),
+        ('Pepino', 0.60, 1.15, 0.75, '2023-09-01', 20, 50, 15, 0.5, 0.5),
+        ('Batata', 0.50, 1.15, 0.75, '2023-09-01', 25, 65, 30, 0.5, 0.5),
+        ('Batata doce', 0.50, 1.15, 0.65, '2023-09-01', 20, 65, 35, 0.5, 0.5),
+        ('Beterraba', 0.50, 1.05, 0.95, '2023-09-01', 20, 50, 30, 0.5, 0.5),
+        ('Mandioca - ano 1', 0.30, 0.80, 0.30, '2023-09-01', 20, 90, 30, 0.5, 0.5),
+        ('Mandioca - ano 2', 0.30, 1.10, 0.50, '2023-09-01', 20, 120, 40, 0.5, 0.5),
+        ('Amendoim', 0.40, 1.15, 0.60, '2023-09-01', 25, 75, 30, 0.5, 0.5),
+        ('Ervilha fresca', 0.50, 1.15, 1.10, '2023-09-01', 20, 55, 15, 0.5, 0.5),
+        ('Ervilha seca', 0.50, 1.15, 0.30, '2023-09-01', 20, 55, 25, 0.5, 0.5),
+        ('Feijão seco', 0.40, 1.15, 0.35, '2023-09-01', 15, 65, 25, 0.5, 0.5),
+        ('Feijão verde', 0.50, 1.05, 0.90, '2023-09-01', 15, 45, 15, 0.5, 0.5),
+        ('Lentilha', 0.40, 1.10, 0.30, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Soja', 0.50, 1.15, 0.50, '2023-09-01', 20, 70, 25, 0.5, 0.5),
+        ('Alcachofra', 0.50, 1.00, 0.95, '2023-09-01', 30, 100, 20, 0.5, 0.5),
+        ('Aspargo', 0.50, 0.95, 0.30, '2023-09-01', 30, 120, 30, 0.5, 0.5),
+        ('Hortelã', 0.60, 1.15, 1.10, '2023-09-01', 20, 60, 15, 0.5, 0.5),
+        ('Morango', 0.40, 0.85, 0.75, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Algodão', 0.35, 1.15, 0.50, '2023-09-01', 30, 90, 30, 0.65, 0.65),
+        ('Linho', 0.35, 1.10, 0.25, '2023-09-01', 25, 70, 25, 0.5, 0.5),
+        ('Milho', 0.30, 1.20, 0.35, '2023-09-01', 20, 65, 30, 0.5, 0.5),
+        ('Trigo (Primavera, 0.5)', 0.30, 1.15, 0.25, '2023-09-01', 20, 60, 30, 0.5, 0.5),
+        ('Sisal', 0.40, 1.05, 0.75, '2023-09-01', 30, 90, 30, 0.5, 0.5),
+        ('Canola', 0.35, 1.15, 0.35, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Gergelim', 0.35, 1.10, 0.25, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Girassol', 0.35, 1.15, 0.35, '2023-09-01', 25, 70, 25, 0.5, 0.5),
+        ('Mamona', 0.35, 1.15, 0.55, '2023-09-01', 30, 80, 30, 0.5, 0.5),
+        ('Arroz', 1.05, 1.20, 0.90, '2023-09-01', 30, 60, 30, 0.5, 0.5),
+        ('Aveia', 0.30, 1.15, 0.25, '2023-09-01', 20, 60, 25, 0.5, 0.5),
+        ('Cevada', 0.30, 1.15, 0.25, '2023-09-01', 20, 60, 25, 0.5, 0.5),
+        ('Milho doce', 0.30, 1.15, 1.05, '2023-09-01', 20, 50, 20, 0.5, 0.5),
+        ('Painço', 0.30, 1.00, 0.30, '2023-09-01', 15, 50, 15, 0.5, 0.5),
+        ('Sorgo-grão', 0.30, 1.10, 0.55, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Cenoura', 0.70, 1.05, 0.95, '2023-09-01', 20, 60, 20, 0.35, 0.35),
+        ('Repolho', 0.70, 1.05, 0.95, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Aipo', 0.70, 1.05, 0.95, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Alho', 0.70, 1.00, 0.70, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Alface', 0.70, 1.00, 0.95, '2023-09-01', 20, 60, 20, 0.3, 0.3),
+        ('Cebola seca', 0.70, 1.05, 0.75, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Cebolinha', 0.70, 1.00, 1.00, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Espinafre', 0.70, 1.00, 0.95, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Rabanete', 0.70, 0.90, 0.85, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Berinjela', 0.60, 1.05, 0.90, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Pimentão', 0.60, 1.05, 0.90, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Tomate', 0.60, 1.15, 0.80, '2023-09-01', 20, 60, 20, 0.4, 0.4),
+        ('Abóbora', 0.50, 1.00, 0.80, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Abobrinha', 0.50, 0.95, 0.75, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Pastinaca', 0.50, 1.05, 0.95, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Nabo', 0.50, 1.10, 0.95, '2023-09-01', 20, 60, 20, 0.5, 0.5),
+        ('Beterraba sacarina', 0.35, 1.20, 0.70, '2023-09-01', 20, 60, 20, 0.5)
     ]
-    cursor.executemany('''
-        INSERT OR IGNORE INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', culturas)
+    for c in culturas:
+        if len(c) == 9:
+            pass
+        elif len(c) == 10:
+            c = c[:9]
+        elif len(c) >= 11:
+            c = c[:9]
+        cursor.execute("""
+            INSERT OR IGNORE INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, f_tab)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, c)
     conn.commit()
     if count == 0:
         culturas = [
-            ('Algodoeiro', 0.35, 1.20, 0.60, '2023-10-01', 30, 50, 40, 7.7, 27.0),
-            ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.7, 10.0),
-            ('Tomate', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 2.5, 12.5),
-            ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.3, 4.0),
-            ('Cebola', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.2, 7.2),
-            ('Tomate tutorado', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 1.0, 3.0),
-            ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.0, 3.0),
-            ('Batata', 0.50, 1.15, 0.75, '2023-08-20', 25, 30, 30, 1.0, 3.0),
-            ('Cebola seca', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.0, 3.0),
-            ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.0, 3.0),
-            ('Melancia', 0.40, 1.00, 0.75, '2023-09-05', 20, 30, 20, 1.0, 3.0)
+            ('Algodoeiro', 0.35, 1.20, 0.60, '2023-10-01', 30, 50, 40, 7.7, 27.0, 0.65),
+            ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.7, 10.0, 0.5),
+            ('Tomate', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 2.5, 12.5, 0.4),
+            ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.3, 4.0, 0.3),
+            ('Cebola', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.2, 7.2, 0.5),
+            ('Tomate tutorado', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 1.0, 3.0, 0.4),
+            ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.0, 3.0, 0.3),
+            ('Batata', 0.50, 1.15, 0.75, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.5),
+            ('Cebola seca', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.0, 3.0, 0.5),
+            ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.0, 3.0, 0.5),
+            ('Melancia', 0.40, 1.00, 0.75, '2023-09-05', 20, 30, 20, 1.0, 3.0, 0.4)
         ]
         cursor.executemany("""
-            INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce, f_tab)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, culturas)
         conn.commit()
-        cursor.executemany('''
-    for cultura in culturas:
-        cursor.execute('''
-            INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce)
-            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-            WHERE NOT EXISTS (SELECT 1 FROM culturas WHERE nome = ?)
-        ''', cultura + (cultura[0],))
+
 
     conn.commit()
     conn.close()
@@ -395,24 +382,23 @@ def seed_culturas():
 def get_culturas():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT id, nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce FROM culturas ORDER BY nome')
+    cursor.execute('SELECT id, nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce, f_tab FROM culturas ORDER BY nome')
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
-def insert_cultura(nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce=1.0, max_ce=3.0):
+def insert_cultura(nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce=1.0, max_ce=3.0, f_tab=0.50):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce))
+        INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce, f_tab)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce, f_tab))
     row_id = cursor.lastrowid
     conn.commit()
     conn.close()
     return row_id
 
-def insert_leitura(umidade, temperatura_max, temperatura_min, eto_calculada=0.0, cad_calculada=0.0, irn_calculada=0.0, comprimento_lateral_m=0.0, perda_carga_total_mca=0.0, codigo_projeto=None):
 def delete_banco(banco_id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -420,34 +406,9 @@ def delete_banco(banco_id):
     conn.commit()
     conn.close()
 
-def insert_projeto(dados):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            INSERT INTO projetos_metadados (
-                codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario,
-                nome_projetista, codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            dados.get('codigo_projeto'),
-            dados.get('nome_projeto'),
-            dados.get('nome_propriedade'),
-            dados.get('nome_proprietario'),
-            dados.get('nome_projetista'),
-            dados.get('codigo_subunidade'),
-            dados.get('area_total_irrigada'),
-            dados.get('area_subunidade'),
-            dados.get('data_elaboracao')
-        ))
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
-    finally:
-        conn.close()
 
-def insert_leitura(umidade, temperatura_max, temperatura_min, eto_calculada=0.0, cad_calculada=0.0, irn_calculada=0.0, comprimento_lateral_m=0.0, perda_carga_total_mca=0.0):
+
+def insert_leitura(umidade, temperatura_max, temperatura_min, eto_calculada=0.0, cad_calculada=0.0, irn_calculada=0.0, comprimento_lateral_m=0.0, perda_carga_total_mca=0.0, codigo_projeto=None):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -508,14 +469,14 @@ def salvar_dados_area_sombreada(codigo_projeto, tipo_calculo, ss_largura, dco_di
         return False
 
     try:
-        cursor.execute('''
+        cursor.execute("""
             UPDATE projetos_metadados
             SET tipo_calculo_ps = ?,
                 ss_largura_faixa = ?,
                 dco_diametro_copa = ?,
                 ps_calculado = ?
             WHERE codigo_projeto = ?
-        ''', (tipo_calculo, ss_largura, dco_diametro, ps_calculado, codigo_projeto))
+        """, (tipo_calculo, ss_largura, dco_diametro, ps_calculado, codigo_projeto))
         conn.commit()
         return True
     except sqlite3.Error as e:
@@ -537,16 +498,28 @@ def obter_projeto_por_codigo(codigo_projeto):
 def obter_resumo_hidraulico(codigo_projeto):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute("""
         SELECT * FROM historico_leitura
         WHERE codigo_projeto = ?
         ORDER BY id DESC LIMIT 1
-    ''', (codigo_projeto,))
+    """, (codigo_projeto,))
     row = cursor.fetchone()
     conn.close()
     if row:
         return dict(row)
     return None
+
+
+
+def insert_projeto_microirrigacao(codigo_projeto, configuracao_linha, tipo_disposicao, condutividade_ko, parametro_alpha, vazao_q, f_ajustado, irn_max_calculada):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    query = "INSERT INTO projeto_microirrigacao (codigo_projeto, configuracao_linha, tipo_disposicao, condutividade_ko, parametro_alpha, vazao_q, f_ajustado, irn_max_calculada) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    cursor.execute(query, (codigo_projeto, configuracao_linha, tipo_disposicao, condutividade_ko, parametro_alpha, vazao_q, f_ajustado, irn_max_calculada))
+    row_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return row_id
 
 def insert_projeto(dados):
     conn = get_db_connection()
@@ -570,7 +543,13 @@ def insert_projeto(dados):
         ))
         conn.commit()
         return True
-    except sqlite3.IntegrityError:
+    except Exception:
         return False
     finally:
         conn.close()
+
+def get_bancos():
+    return []
+
+def insert_banco(nome, taxa):
+    pass
