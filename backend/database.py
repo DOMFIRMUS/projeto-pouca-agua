@@ -79,6 +79,7 @@ cursor.execute('''
             perda_carga_total_mca REAL,
             data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+    ''')
     """)
     cursor.execute("""
     """)
@@ -174,17 +175,12 @@ cursor.execute('''
             nome_proprietario TEXT,
             nome_projetista TEXT,
             data_elaboracao TEXT,
-            identificacao TEXT,
             nome_codigo_subunidade TEXT,
             largura INTEGER,
             altura INTEGER,
             profundidade INTEGER,
             tipo_calculo_ps TEXT CHECK(tipo_calculo_ps IN ('faixa_sombreada', 'diametro_copa', NULL)),
             ps_calculado REAL
-            identificacao TEXT,
-            nome_codigo_subunidade TEXT,
-            area_total_irrigada REAL,
-            area_subunidade REAL,
             data_elaboracao TEXT,
             largura INTEGER,
             altura INTEGER,
@@ -306,6 +302,14 @@ def update_area_umedecida_projeto(codigo_projeto, rw, dw, pw, tipo_disposicao, c
 
 
 
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS bancos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            taxa_mensal REAL NOT NULL
+        )
+    ''')
 
     # Try to add missing columns in case the table already exists
     cursor.execute("PRAGMA table_info(projetos_metadados)")
@@ -531,6 +535,12 @@ def seed_culturas():
         ('Beterraba sacarina', 0.35, 1.20, 0.70, '2023-09-01', 20, 60, 20)
     ]
     cursor.executemany("""
+        INSERT OR IGNORE INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1.0, 3.0)
+    """, culturas)
+    conn.commit()
+    for cultura in culturas:
+        cursor.execute("""
         INSERT OR IGNORE INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, culturas)
@@ -579,7 +589,7 @@ def seed_culturas():
             WHERE NOT EXISTS (SELECT 1 FROM culturas WHERE nome = ?)
         """, cultura + (cultura[0],))
             INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce)
-            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?, 1.0, 3.0
             WHERE NOT EXISTS (SELECT 1 FROM culturas WHERE nome = ?)
         """, cultura + (cultura[0],))
 
@@ -1160,6 +1170,12 @@ def salvar_hidraulica_lateral(codigo_projeto, perfil_pressao, lmax, status):
     finally:
         conn.close()
 
+def get_bancos():
+    return []
+def insert_banco(nome, taxa):
+    pass
+def delete_banco(id):
+    pass
 def get_projeto_hidraulica_lateral(codigo_projeto):
 def obter_hidraulica_lateral(codigo_projeto):
     conn = get_db_connection()

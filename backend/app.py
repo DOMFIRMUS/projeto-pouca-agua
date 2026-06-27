@@ -21,6 +21,31 @@ def linha_lateral_declive_endpoint(codigo_projeto):
         return jsonify({"erro": "Projeto inexistente."}), 404
 
 import datetime
+
+
+
+
+from backend.database import (
+    get_db_connection,
+    insert_projeto,
+    get_projeto_metadados,
+    vincular_cultura_projeto,
+    update_area_umedecida_projeto,
+    update_area_sombreada_projeto,
+    get_culturas,
+    insert_leitura,
+    get_ultima_leitura,
+    get_historico
+)
+from backend.models.irrigacao import CalculadorIrrigacao
+from backend.models.irrigacao import CalculadorIrrigacao
+import datetime
+
+
+
+
+from backend.database import init_db, obter_projeto_por_codigo, obter_resumo_hidraulico, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_bancos, insert_banco, delete_banco
+from backend.database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, insert_projeto
 from backend.database import init_db, insert_leitura, get_ultima_leitura, update_leitura_status, get_historico, seed_culturas, get_culturas, get_projeto_metadados, get_bancos, insert_banco, delete_banco, insert_projeto
 
 
@@ -732,6 +757,9 @@ def perda_carga():
 
         culturas = get_culturas()
         cultura_selecionada = next((c for c in culturas if c['id'] == cultura_id), None)
+    except (ValueError, TypeError):
+        return jsonify({"erro": "Erro ao processar os dados."}), 400
+
     except (ValueError, KeyError, TypeError):
         return jsonify({"erro": "Erro parsing json"}), 400
     except Exception as e:
@@ -874,6 +902,29 @@ def salvar_projeto_metadados():
             if campo not in dados:
                 return jsonify({"erro": f"O campo '{campo}' é obrigatório."}), 400
 
+
+    if "erro" in resultado:
+        return jsonify(resultado), 400
+    return jsonify({"erro": "Parâmetros inválidos"}), 400
+
+    validacao = calculador.validar_criterio_pressao_subunidade(
+        resultado['perda_carga_mca'],
+        pressao_entrada_mca
+    )
+
+    resultado.update(validacao)
+
+    return jsonify(resultado), 200
+
+@app.route('/api/projetos', methods=['POST'])
+def salvar_projeto_metadados():
+    dados = request.get_json()
+    if not dados:
+        return jsonify({"erro": "Nenhum dado enviado"}), 400
+
+    campos_obrigatorios = ['codigo_projeto', 'nome_projeto', 'largura', 'altura', 'profundidade']
+    for campo in campos_obrigatorios:
+        if campo not in dados:
         pass # end if diametro_mm
 
     return jsonify({"erro": "Parâmetros não reconhecidos."}), 400
@@ -1010,6 +1061,19 @@ def salvar_projeto_metadados():
         return jsonify({"status": "sucesso", "mensagem": "Projeto salvo com sucesso"}), 201
     else:
         return jsonify({"erro": "O código do projeto já existe (restrição de unicidade)."}), 409
+@app.route('/api/classificar_perfil', methods=['POST'])
+@app.route('/api/hidraulica_classificacao', methods=['POST'])
+@app.route('/api/hidraulica/perfil', methods=['POST'])
+@app.route('/api/hidraulica_perfil', methods=['POST'])
+@app.route('/api/classificar_hidraulica', methods=['POST'])
+def obter_classificacao_perfil():
+    pass
+
+@app.route('/api/projetos/<string:codigo_projeto>/area-umedecida', methods=['POST'])
+def calcular_area_umedecida_endpoint(codigo_projeto):
+    """
+    Rotina 4 - Pw (Raio Umedecido Rw, Diametro Molhado Dw, Area Umedecida Pw)
+    """
 
 def hidraulica():
     dados = request.get_json()
