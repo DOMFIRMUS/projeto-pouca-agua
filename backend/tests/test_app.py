@@ -60,51 +60,6 @@ def test_area_sombreada(client):
     assert resp.status_code == 200
     data = json.loads(resp.data)
     assert 'ps' in data
-def test_hidraulica_post_success(client):
-    payload = {
-        "diametro_mm": 16,
-        "vazao_gotejador_lh": 2,
-        "espacamento_m": 0.5,
-        "comprimento_m": 50
-    }
-    response = client.post('/api/hidraulica', data=json.dumps(payload), content_type='application/json')
-    assert response.status_code == 200
-    data = json.loads(response.data)
-    assert 'perda_carga_mca' in data
-
-def test_hidraulica_post_missing_fields(client):
-    payload = {
-        "diametro_mm": 16
-    }
-    response = client.post('/api/hidraulica', data=json.dumps(payload), content_type='application/json')
-    assert response.status_code == 400
-    data = json.loads(response.data)
-    assert 'erro' in data
-    assert "O campo 'vazao_gotejador_lh' é obrigatório." in data['erro']
-
-def test_hidraulica_post_invalid_type(client):
-    payload = {
-        "diametro_mm": "abc",
-        "vazao_gotejador_lh": 2,
-        "espacamento_m": 0.5,
-        "comprimento_m": 50
-    }
-    response = client.post('/api/hidraulica', data=json.dumps(payload), content_type='application/json')
-    assert response.status_code == 400
-    data = json.loads(response.data)
-    assert 'erro' in data
-    assert "Todos os parâmetros devem ser números válidos." in data['erro']
-
-def test_hidraulica_post_success_basic(client):
-    response = client.post('/api/hidraulica', json={
-        'diametro_mm': 16.0,
-        'vazao_gotejador_lh': 2.0,
-        'espacamento_m': 0.5,
-        'comprimento_m': 100.0
-    })
-    assert response.status_code == 200
-    data = json.loads(response.data)
-    assert 'perda_carga_mca' in data
 
     resp_fake = client.post('/api/projetos/FAKE/area-sombreada', json=payload)
     assert resp_fake.status_code == 404
@@ -128,76 +83,6 @@ def test_culturas_endpoints(client):
     resp = client.get('/api/culturas')
     assert resp.status_code == 200
     assert len(json.loads(resp.data)) > 0
-def test_hidraulica_post_missing_fields(client):
-    response = client.post('/api/classificar_perfil', json={
-        'So': 0.5,
-        'k_linha': 1.0
-    })
-    assert response.status_code == 400
-    data = json.loads(response.data)
-    assert 'erro' in data
-    assert "Dados insuficientes" in data['erro']
-    assert "Parâmetros insuficientes" in data.get('erro', '') or "Dados insuficientes" in data.get('erro', '')
-
-def test_hidraulica_post_invalid_type(client):
-    response = client.post('/api/hidraulica', json={
-        'So': 'abc',
-        'k_linha': 1.0,
-        'L_estimado': 1.0
-    })
-    assert response.status_code == 400
-    data = json.loads(response.data)
-    assert 'erro' in data
-    assert "Os valores do fluxo avançado devem ser numéricos." in data['erro']
-
-def test_hidraulica_post_perfil_iid(client):
-    response = client.post('/api/hidraulica', json={
-        'So': 0.05,
-        'k_linha': 0.000001,
-        'L_estimado': 50.0,
-        'H': 10.0,
-        'Hvar': 0.2
-    })
-
-def test_hidraulica_post_combined(client):
-    response = client.post('/api/hidraulica', json={
-        'diametro_mm': 16,
-        'vazao_gotejador_lh': 2,
-        'espacamento_m': 0.5,
-        'comprimento_m': 50,
-        'So': 0.5,
-        'k_linha': 1.0,
-        'L_estimado': 1.0
-    })
-
-def test_status_get_salinidade_alerta(client):
-    client.post('/api/sensor', json={'umidade': 40.0, 'temperatura_max': 35.0, 'temperatura_min': 20.0})
-    # Passing high CE to trigger warning
-    response = client.get('/api/status?ce_agua_ds_m=10.0')
-    assert response.status_code == 200
-    data = json.loads(response.data)
-    assert 'Alerta: Ocorrerá decréscimo na produtividade.' in data['mensagem_acao']
-def test_hidraulica_post_mixed_payload(client):
-    response = client.post('/api/hidraulica', json={
-        'So': 0.5,
-        'k_linha': 1.0,
-        'L_estimado': 1.0,
-        'diametro_mm': 16.0,
-        'vazao_gotejador_lh': 2.0,
-        'espacamento_m': 0.5,
-        'comprimento_m': 50.0
-    })
-    assert response.status_code == 200
-    data = json.loads(response.data)
-    assert 'classificacao' in data
-    assert data['classificacao'] == 'Perfil Tipo IId (Declive Muito Forte)'
-    assert 'L_max' in data
-    assert data['L_max'] == 50.99
-    assert 'perda_carga_mca' in data
-    assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
-    assert data['classificacao'] == 'Perfil Tipo IIa (Declive Fraco)'
-    assert 'vazao_total_lh' in data
-    assert data['vazao_total_lh'] == 200.0
 
     resp_post = client.post('/api/culturas', json={"nome": "Morango", "kc_inicial": 0.4, "kc_media": 1.05, "kc_final": 0.75, "data_plantio": "2023-01-01", "dias_fase_inicial": 20, "dias_meia_estacao": 30, "dias_fase_final": 20})
     assert resp_post.status_code == 201

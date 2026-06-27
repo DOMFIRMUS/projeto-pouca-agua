@@ -151,10 +151,6 @@ class CalculadorIrrigacao:
 
         return self.tabela_ra[lat_par][mes_index - 1]
 
-    def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
-        pass # stub
-
-    def calcular_pressao_atual_ea(self, es, umidade_relativa_media_ur):
         """
         Calcula a Pressão Atual de Vapor (ea) em kPa.
         Equação 15 da Tese: ea = es * (UR_m / 100)
@@ -696,75 +692,6 @@ class CalculadorIrrigacao:
             iteracoes += 1
 
         raise ValueError("A iteração para calcular L não convergiu após 1000 passos.")
-
-    def calcular_porcentagem_area_sombreada_ps(self, tipo_calculo, params):
-        if tipo_calculo not in ['faixa_sombreada', 'diametro_copa']:
-            raise ValueError('Método de cálculo de área sombreada inválido ou dados insuficientes.')
-
-        ps = 0.0
-
-        if tipo_calculo == 'faixa_sombreada':
-            ss_largura = params.get('ss_largura')
-            sr_espacamento = params.get('sr_espacamento')
-
-            if ss_largura is None or sr_espacamento is None:
-                raise ValueError('Método de cálculo de área sombreada inválido ou dados insuficientes.')
-
-            if sr_espacamento <= 0:
-                return 0.0
-
-            # Equação 28
-            ps = (ss_largura / sr_espacamento) * 100.0
-
-        elif tipo_calculo == 'diametro_copa':
-            dco_diametro = params.get('dco_diametro')
-            sr_espacamento = params.get('sr_espacamento')
-            sp_espacamento = params.get('sp_espacamento')
-
-            if dco_diametro is None or sr_espacamento is None or sp_espacamento is None:
-                raise ValueError('Método de cálculo de área sombreada inválido ou dados insuficientes.')
-
-            if sr_espacamento <= 0 or sp_espacamento <= 0:
-                return 0.0
-
-            # Equação 29
-            area_copa = math.pi * ((dco_diametro ** 2) / 4.0)
-            area_plantio = sr_espacamento * sp_espacamento
-            ps = (area_copa / area_plantio) * 100.0
-
-        # Normalização limitando o teto matemático a 100.0 e arredondando para 2 casas
-        ps = min(ps, 100.0)
-        return round(ps, 2)
-    def calcular_lmax_perfil_tipo_IIa(self, H, Hvar, So, k_linha, chute_inicial=50.0):
-        L = chute_inicial
-        iteracoes = 0
-        while iteracoes < 1000:
-            iteracoes += 1
-
-    def _calcular_condicao_59(self, So, k_linha, L):
-        # Condição da Equação 59
-        condicao = So / (k_linha * (L ** 1.75))
-        if not (0 < condicao < 1):
-            raise ValueError(f"Condição da Equação 59 não satisfeita (deve estar entre 0 e 1): {condicao}")
-
-            # Equação 61
-            razao_lL = 1 - 0.56098 * (condicao ** 0.57143)
-
-            # Equação 60
-            numerador = H * Hvar
-            denominador = ((1 - ((1 - razao_lL) ** 2.35)) * k_linha * (L ** 1.33)) - (razao_lL * So)
-
-            if denominador == 0:
-                 raise ZeroDivisionError("Divisão por zero ao calcular o novo comprimento L.")
-
-            L_novo = numerador / denominador
-
-            # Critério de paragem
-            if abs(L_novo - L) < 0.001:
-                return round(L_novo, 3)
-
-            L = L_novo
-
         raise Exception("O cálculo não convergiu após o número máximo de iterações.")
 
     def classificar_perfil_pressao(self, So, k_linha, L_estimado):
@@ -1155,3 +1082,20 @@ class CalculadorIrrigacao:
                 resultado["alerta"] = "a faixa contínua será rompida"
 
         return resultado
+
+    def calcular_irrigacao_total_necessaria_itn(self, irn, cei, cee, eap=100.0):
+        if irn <= 0:
+            return 0.0
+
+        if cee <= 0 or (5 * cee - cei) <= 0:
+            fl = 0.0
+        else:
+            fl = cei / (5 * cee - cei)
+
+        fl = min(fl, 0.40)
+
+        if fl >= 1.0:
+            return round(irn, 3)
+
+        itn = irn / ((1.0 - fl) * (eap / 100.0))
+        return round(itn, 3)
