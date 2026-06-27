@@ -1422,6 +1422,39 @@ class CalculadorIrrigacao:
 
         return resultado
 
+    def calcular_ponto_pressao_minima_ratio(self, declividade_so, k_linha, comprimento_l):
+        import math
+        declividade_abs = abs(declividade_so)
+        atrito_total = k_linha * math.pow(comprimento_l, 1.75)
+        if atrito_total <= 0: return 1.0
+        razao = declividade_abs / atrito_total
+        ratio = 1.0 - 0.56098 * math.pow(razao, 0.57143)
+        return max(0.0, min(1.0, ratio))
+
+    def refinar_lmax_perfil_ii_a(self, pressao_h, h_var_fraction, k_linha, declividade_so, max_iter=200, tol=1e-4):
+        import math
+        L = 100.0
+        for _ in range(max_iter):
+            r_min = self.calcular_ponto_pressao_minima_ratio(declividade_so, k_linha, L)
+            base_potencia = 1.0 - r_min
+            denominador_atrito = (1.0 - math.pow(abs(base_potencia), 2.75)) * k_linha * math.pow(abs(L), 1.75)
+            denominador_gravidade = r_min * abs(declividade_so)
+            denominador = denominador_atrito - denominador_gravidade
+            if denominador <= 0: return 0.0
+            L_novo = (pressao_h * h_var_fraction) / denominador
+            if abs(L_novo - L) <= tol: return round(L_novo, 3)
+            L = L_novo
+        return round(L, 3)
+
+    def classificar_dimensionar_perfil_ii_b(self, pressao_h, h_var_fraction, k_linha, declividade_so, L_estimado):
+        import math
+        so_abs = abs(declividade_so)
+        if so_abs == 0: return 0.0
+        razao = (k_linha * math.pow(L_estimado, 1.75)) / so_abs
+        if math.isclose(razao, 1.0, rel_tol=1e-2):
+            l_max = (pressao_h * h_var_fraction) / (0.357 * so_abs)
+            return round(l_max, 3)
+        return None
     def calcular_cad(self, theta_cc, theta_pmp, z):
         if theta_cc <= theta_pmp or z <= 0:
             return 0.0

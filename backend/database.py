@@ -73,6 +73,9 @@ cursor.execute('''
             cad_calculada REAL,
             irn_calculada REAL,
             comprimento_lateral_m REAL,
+            data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
             perda_carga_total_mca REAL,
             data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -128,6 +131,23 @@ cursor.execute('''
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT NOT NULL,
             taxa_mensal REAL NOT NULL
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS projeto_hidraulica_lateral (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo_projeto TEXT UNIQUE,
+            pressao_h REAL,
+            h_var_fraction REAL,
+            declividade_so REAL,
+            k_linha REAL,
+            l_estimado REAL,
+            razo_ponto_minimo_ell_l REAL,
+            lmax_perfil_ii_a REAL,
+            lmax_perfil_ii_b REAL,
+            perfil_pressao_tipo TEXT,
+            FOREIGN KEY (codigo_projeto) REFERENCES projetos_metadados(codigo_projeto)
         )
     """)
 
@@ -285,6 +305,8 @@ def update_area_umedecida_projeto(codigo_projeto, rw, dw, pw, tipo_disposicao, c
     conn.close()
 
 
+
+
     # Try to add missing columns in case the table already exists
     cursor.execute("PRAGMA table_info(projetos_metadados)")
     columns = [info[1] for info in cursor.fetchall()]
@@ -312,6 +334,7 @@ def update_area_umedecida_projeto(codigo_projeto, rw, dw, pw, tipo_disposicao, c
 
     conn.close()
 
+def insert_projeto(dados):
 def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, profundidade):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -339,6 +362,7 @@ def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, prof
             data_elaboracao
         ))
         row_id = cursor.lastrowid
+    except Exception:
         cursor.execute("""
             INSERT INTO projetos_metadados (
                 codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario,
@@ -982,10 +1006,16 @@ def salvar_dados_area_umedecida(codigo_projeto, dados):
         return dict(row)
     return None
 
-def insert_projeto(dados):
+
+def salvar_projeto_hidraulica_lateral(codigo_projeto, pressao_h, h_var_fraction, declividade_so, k_linha, l_estimado, razo_ponto, lmax_iia, lmax_iib, perfil_tipo):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        cursor.execute("INSERT INTO projeto_hidraulica_lateral (codigo_projeto, pressao_h, h_var_fraction, declividade_so, k_linha, l_estimado, razo_ponto_minimo_ell_l, lmax_perfil_ii_a, lmax_perfil_ii_b, perfil_pressao_tipo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(codigo_projeto) DO UPDATE SET pressao_h=excluded.pressao_h, h_var_fraction=excluded.h_var_fraction, declividade_so=excluded.declividade_so, k_linha=excluded.k_linha, l_estimado=excluded.l_estimado, razo_ponto_minimo_ell_l=excluded.razo_ponto_minimo_ell_l, lmax_perfil_ii_a=excluded.lmax_perfil_ii_a, lmax_perfil_ii_b=excluded.lmax_perfil_ii_b, perfil_pressao_tipo=excluded.perfil_pressao_tipo", (codigo_projeto, pressao_h, h_var_fraction, declividade_so, k_linha, l_estimado, razo_ponto, lmax_iia, lmax_iib, perfil_tipo))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error saving: {e}")
         cursor.execute("""
             INSERT INTO projetos_metadados (
                 codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario,
