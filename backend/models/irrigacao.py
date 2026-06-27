@@ -1,8 +1,225 @@
+# -*- coding: utf-8 -*-
 import math
-import datetime
 
 class CalculadorIrrigacao:
+    def calcular_cad(self, theta_cc, theta_pmp, z):
+        if float(theta_cc) < float(theta_pmp) or float(z) <= 0:
 
+    def calcular_fator_atrito_p66(self, reynolds_r):
+        """
+        Calcula o fator de atrito (f) com base nas equações 48 e 49 (Página 66 da tese).
+        """
+        if reynolds_r <= 0:
+            return 0.0
+
+        if reynolds_r < 2000:
+            f = 64.0 / reynolds_r
+        elif 2000 <= reynolds_r <= 3000:
+            f = 0.04
+        else:
+            f = 0.316 / (reynolds_r ** 0.25)
+
+        return round(f, 4)
+
+    def calcular_perda_carga_lateral_hf(self, vazao_q, diametro_d, comprimento_l, lambda_fator=1.0):
+        """
+        Calcula a perda de carga contínua na linha lateral (Equação 50 - Pág. 66).
+        """
+        if diametro_d <= 0 or comprimento_l < 0:
+            return 0.0
+
+        q_calc = vazao_q
+        if vazao_q >= 1.0:
+            q_calc = vazao_q / 1000.0
+
+        d_calc = diametro_d
+        if diametro_d >= 1.0:
+            d_calc = diametro_d / 1000.0
+
+        hf = 2.8287e-4 * (q_calc ** 1.75) * (d_calc ** -4.75) * comprimento_l * lambda_fator
+
+        return round(hf, 3)
+
+
+    def validar_limites_vilaca(self, v_d, d_d, a_p, d_c, l_c, v_c, v_l):
+        """
+        Valida os parâmetros do modelo de perdas localizadas segundo Vilaça (2012)
+        Página 76 da tese. Retorna dicionário contendo lista de parâmetros estourados.
+        """
+        alertas = []
+
+        # Limites Passagem Direta
+        if not (0.133 <= v_d <= 3.0): alertas.append(f"v_d={v_d} fora de (0.133 - 3.0)")
+        if not (0.0357 <= d_d <= 0.0721): alertas.append(f"d_d={d_d} fora de (0.0357 - 0.0721)")
+        if not (103e-6 <= a_p <= 355e-6): alertas.append(f"a_p={a_p} fora de (103e-6 - 355e-6)")
+
+        # Limites Passagem Lateral
+        if not (0.0078 <= d_c <= 0.0167): alertas.append(f"d_c={d_c} fora de (0.0078 - 0.0167)")
+        if not (0.0495 <= l_c <= 0.0664): alertas.append(f"l_c={l_c} fora de (0.0495 - 0.0664)")
+        if not (0.267 <= v_c <= 14.378): alertas.append(f"v_c={v_c} fora de (0.267 - 14.378)")
+        if not (0.132 <= v_l <= 3.0): alertas.append(f"v_l={v_l} fora de (0.132 - 3.0)")
+
+        return {
+            "limites_estourados": len(alertas) > 0,
+            "alertas": alertas
+        }
+
+    def calcular_perda_direta_hfl_d(self, v_d, d_d, a_p):
+        """
+        Calcula a perda localizada por passagem direta. Eq. 76, Pág 76.
+        """
+        import math
+        # Trava de Segurança Física
+        if d_d <= 0 or v_d <= 0 or a_p <= 0:
+            return 0.0
+
+        hfl_d = 0.043695 * (v_d ** 1.897) * (d_d ** -2.428) * (a_p ** 1.109)
+        return round(hfl_d, 5)
+
+    def calcular_perda_lateral_hfl_l(self, d_c, l_c, v_c, v_l):
+        """
+        Calcula a perda localizada por passagem lateral. Eq. 77, Pág 76.
+        """
+        import math
+        # Trava de Segurança Física
+        if d_c <= 0 or l_c <= 0 or v_c <= 0 or v_l <= 0:
+            return 0.0
+
+        hfl_l = 2.268121 * (d_c ** 0.106) * (l_c ** 1.057) * (v_c ** 1.766) * (v_l ** 0.386)
+        return round(hfl_l, 5)
+
+
+    def obter_duracao_maxima_n(self, latitude_sul, mes_index):
+        if mes_index < 1 or mes_index > 12:
+            mes_index = 1
+        lat_abs = abs(latitude_sul)
+        if lat_abs >= 70:
+            return self.MATRIZ_N_MAX_SUL[70][int(mes_index) - 1]
+        if lat_abs <= 0:
+            return self.MATRIZ_N_MAX_SUL[0][int(mes_index) - 1]
+
+        lat_lower = int(lat_abs // 2) * 2
+        lat_upper = lat_lower + 2
+
+        if lat_lower == lat_abs:
+            return self.MATRIZ_N_MAX_SUL[lat_lower][int(mes_index) - 1]
+
+        n_lower = self.MATRIZ_N_MAX_SUL[lat_lower][int(mes_index) - 1]
+        n_upper = self.MATRIZ_N_MAX_SUL[lat_upper][int(mes_index) - 1]
+
+        fracao = (lat_abs - lat_lower) / 2.0
+        n_interp = n_lower + fracao * (n_upper - n_lower)
+        return n_interp
+
+    def calcular_radiacao_solar_rs(self, ra_calculado, n_insolacao, N_maximo):
+        if N_maximo <= 0:
+            razao_nN = 0.0
+        else:
+            razao_nN = n_insolacao / N_maximo
+
+        rs = (0.25 + 0.50 * razao_nN) * ra_calculado
+        return round(rs, 3)
+
+
+    MATRIZ_N_MAX_SUL = {
+        70: [24.0, 17.4, 13.0, 8.4, 2.7, 0.0, 0.0, 6.4, 11.2, 15.7, 21.7, 24.0],
+        68: [21.9, 16.7, 12.9, 8.7, 4.3, 0.0, 1.7, 7.0, 11.3, 15.3, 19.9, 24.0],
+        66: [20.1, 16.2, 12.8, 9.1, 5.3, 2.0, 3.7, 7.6, 11.3, 15.0, 18.8, 22.1],
+        64: [19.0, 15.8, 12.8, 9.3, 6.1, 3.7, 4.8, 8.0, 11.4, 14.7, 18.0, 20.3],
+        62: [18.3, 15.5, 12.7, 9.6, 6.7, 4.8, 5.6, 8.3, 11.4, 14.5, 17.4, 19.2],
+        60: [17.6, 15.2, 12.6, 9.8, 7.2, 5.6, 6.3, 8.7, 11.5, 14.3, 16.9, 18.4],
+        58: [17.1, 14.9, 12.6, 9.9, 7.6, 6.2, 6.8, 8.9, 11.5, 14.1, 16.5, 17.8],
+        56: [16.7, 14.7, 12.5, 10.1, 8.0, 6.7, 7.2, 9.2, 11.6, 13.9, 16.1, 17.3],
+        54: [16.3, 14.5, 12.5, 10.2, 8.3, 7.2, 7.6, 9.4, 11.6, 13.8, 15.8, 16.9],
+        52: [16.0, 14.3, 12.5, 10.4, 8.6, 7.5, 8.0, 9.6, 11.6, 13.7, 15.5, 16.5],
+        50: [15.7, 14.2, 12.4, 10.5, 8.8, 7.9, 8.3, 9.7, 11.7, 13.7, 15.3, 16.1],
+        48: [15.4, 14.0, 12.4, 10.6, 9.0, 8.2, 8.5, 9.9, 11.7, 13.4, 15.0, 15.8],
+        46: [15.2, 13.9, 12.4, 10.7, 9.2, 8.5, 8.8, 10.0, 11.7, 13.3, 14.8, 15.5],
+        44: [14.9, 13.7, 12.4, 10.8, 9.4, 8.7, 9.0, 10.2, 11.7, 13.3, 14.6, 15.3],
+        42: [14.7, 13.6, 12.3, 10.8, 9.6, 9.0, 9.2, 10.3, 11.7, 13.2, 14.4, 15.0],
+        40: [14.5, 13.5, 12.3, 10.9, 9.8, 9.2, 9.4, 10.4, 11.8, 13.1, 14.3, 14.8],
+        38: [14.4, 13.4, 12.3, 11.0, 9.9, 9.4, 9.6, 10.5, 11.8, 13.0, 14.1, 14.6],
+        36: [14.2, 13.3, 12.3, 11.1, 10.1, 9.6, 9.8, 10.6, 11.8, 12.9, 13.9, 14.4],
+        34: [14.0, 13.2, 12.2, 11.1, 10.2, 9.7, 9.9, 10.7, 11.8, 12.9, 13.8, 14.3],
+        32: [13.9, 13.1, 12.2, 11.2, 10.4, 9.9, 10.1, 10.8, 11.8, 12.8, 13.7, 14.1],
+        30: [13.7, 13.0, 12.2, 11.3, 10.5, 10.1, 10.2, 10.9, 11.8, 12.7, 13.5, 13.9],
+        28: [13.6, 13.0, 12.2, 11.3, 10.6, 10.2, 10.4, 11.0, 11.8, 12.7, 13.4, 13.8],
+        26: [13.5, 12.9, 12.2, 11.4, 10.7, 10.4, 10.5, 11.1, 11.9, 12.6, 13.3, 13.6],
+        24: [13.3, 12.8, 12.2, 11.4, 10.8, 10.5, 10.7, 11.2, 11.9, 12.6, 13.2, 13.5],
+        22: [13.2, 12.7, 12.1, 11.5, 10.9, 10.7, 10.8, 11.2, 11.9, 12.5, 13.1, 13.3],
+        20: [13.1, 12.7, 12.1, 11.5, 11.1, 10.8, 10.9, 11.3, 11.9, 12.5, 13.0, 13.2],
+        18: [13.0, 12.6, 12.1, 11.6, 11.2, 10.9, 11.0, 11.4, 11.9, 12.4, 12.9, 13.1],
+        16: [12.9, 12.5, 12.1, 11.6, 11.3, 11.1, 11.1, 11.5, 11.9, 12.4, 12.8, 12.9],
+        14: [12.7, 12.4, 12.1, 11.7, 11.4, 11.2, 11.2, 11.5, 11.9, 12.3, 12.7, 12.8],
+        12: [12.6, 12.4, 12.1, 11.7, 11.4, 11.3, 11.4, 11.6, 11.9, 12.3, 12.6, 12.7],
+        10: [12.5, 12.3, 12.1, 11.8, 11.5, 11.4, 11.5, 11.7, 11.9, 12.2, 12.5, 12.6],
+        8:  [12.4, 12.3, 12.1, 11.8, 11.6, 11.5, 11.6, 11.7, 12.0, 12.2, 12.4, 12.5],
+        6:  [12.3, 12.2, 12.0, 11.9, 11.7, 11.7, 11.7, 11.8, 12.0, 12.1, 12.3, 12.3],
+        4:  [12.2, 12.1, 12.0, 11.9, 11.8, 11.8, 11.8, 11.9, 12.0, 12.1, 12.2, 12.2],
+        2:  [12.1, 12.1, 12.0, 12.0, 11.9, 11.9, 11.9, 11.9, 12.0, 12.0, 12.1, 12.1],
+        0:  [12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0]
+    }
+
+    # Complemento obrigatório da Tabela 5
+    DADOS_STEFAN_BOLTZMANN_P52 = {
+        5.0: 29.35,  6.0: 29.78,  6.5: 29.99,  7.0: 30.21,  7.5: 30.42,  8.0: 30.64,  8.5: 30.86,  9.0: 31.08,  9.5: 31.30,  10.0: 31.52, 10.5: 31.74, 11.0: 31.97, 11.5: 32.19, 12.0: 32.42, 12.5: 32.65, 13.0: 32.88, 13.5: 33.11, 14.0: 33.34, 14.5: 33.57, 15.0: 33.81, 15.5: 34.04, 16.0: 34.28, 16.5: 34.52,
+        21.0: 36.71, 22.0: 37.21, 22.5: 37.47, 23.0: 37.72, 23.5: 37.98, 24.0: 38.23, 24.5: 38.49, 25.0: 38.75, 25.5: 39.01, 26.0: 39.27, 26.5: 39.53, 27.0: 39.80, 27.5: 40.06, 28.0: 40.33, 28.5: 40.60, 29.0: 40.87, 29.5: 41.14, 30.0: 41.41, 30.5: 41.69, 31.0: 41.96, 31.5: 42.24, 32.0: 42.52, 32.5: 42.80,
+        37.0: 45.37, 38.0: 45.96, 38.5: 46.26, 39.0: 46.56, 39.5: 46.85, 40.0: 47.15, 40.5: 47.46, 41.0: 47.76, 41.5: 48.06, 42.0: 48.37, 42.5: 48.68, 43.0: 48.99, 43.5: 49.30, 44.0: 49.61, 44.5: 49.92, 45.0: 50.24, 45.5: 50.56, 46.0: 50.87, 46.5: 51.19, 47.0: 51.51, 47.5: 51.84, 48.0: 52.16, 48.5: 52.49
+    }
+
+    def obter_stefan_boltzmann(self, t_media):
+        """
+        Interpolação linear contínua para a Tabela 5.
+        """
+        # Trata limites absolutos se t_media for menor que o menor ou maior que o maior da tabela
+        keys = sorted(list(self.DADOS_STEFAN_BOLTZMANN_P52.keys()))
+        if t_media <= keys[0]:
+            return self.DADOS_STEFAN_BOLTZMANN_P52[keys[0]]
+        if t_media >= keys[-1]:
+            return self.DADOS_STEFAN_BOLTZMANN_P52[keys[-1]]
+
+        # Encontra os vizinhos mais próximos
+        menor = keys[0]
+        maior = keys[-1]
+        for k in keys:
+            if k <= t_media:
+                menor = k
+            if k > t_media:
+                maior = k
+                break
+
+        if menor == maior:
+            return self.DADOS_STEFAN_BOLTZMANN_P52[menor]
+
+        v_menor = self.DADOS_STEFAN_BOLTZMANN_P52[menor]
+        v_maior = self.DADOS_STEFAN_BOLTZMANN_P52[maior]
+
+        interpolado = v_menor + (v_maior - v_menor) * (t_media - menor) / (maior - menor)
+        return round(interpolado, 2)
+
+    def calcular_declividade_delta(self, t_media):
+        """
+        Equação 21: Declividade da curva de pressão de vapor (Delta)
+        """
+        denominador = t_media + 237.3
+        if denominador == 0:
+            return 0.0
+
+        exp_term = math.exp((17.27 * t_media) / denominador)
+        numerador = 4098 * (0.6108 * exp_term)
+        delta = numerador / (denominador ** 2)
+        return round(delta, 4)
+
+    def calcular_pressao_atmosferica_p(self, altitude_z):
+        """
+        Equação 22: Pressão Atmosférica baseada na altitude (P)
+        """
+        term = 293 - 0.0065 * altitude_z
+        if term < 0:
+            term = 0.0
+
+        p = 101.3 * ((term / 293) ** 5.26)
+        return round(p, 2)
     def definir_kc_por_estagio(self, kc_inicial, kc_media, kc_final, estagio):
         if estagio == 'inicial':
             return kc_inicial
@@ -77,7 +294,7 @@ class CalculadorIrrigacao:
             mes_index = 1
 
         # Usa o valor absoluto da latitude e limita entre 0 e 40
-        lat_abs = abs(latitude_sul)
+        lat_abs = abs(20)
         lat_limitada = max(0, min(40, lat_abs))
 
         # Arredonda para o número par mais próximo
@@ -138,7 +355,7 @@ class CalculadorIrrigacao:
             mes_index = 1
 
         # O valor da latitude vem do GPS, convertemos para absoluto (caso negativo)
-        lat_abs = abs(latitude_sul)
+        lat_abs = abs(20)
 
         # Arredonda para o valor par mais próximo
         lat_par = round(lat_abs / 2) * 2
@@ -152,6 +369,8 @@ class CalculadorIrrigacao:
         return self.tabela_ra[lat_par][mes_index - 1]
 
     def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
+        pass
+        pass
         pass # stub
 
     def calcular_pressao_atual_ea(self, es, umidade_relativa_media_ur):
@@ -168,6 +387,10 @@ class CalculadorIrrigacao:
         """
         return round(es - ea, 4)
 
+    def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=-22.0):
+    def calcular_eto_blaney_criddle(self, t_media, mes_index):
+        pass
+        pass
     def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
         """
         Baseado na Tabela 3 - Percentagem diária de horas anuais de luz solar (P) para Latitude Sul.
@@ -198,7 +421,7 @@ class CalculadorIrrigacao:
         if mes_index < 1 or mes_index > 12:
             mes_index = 1
 
-        lat_abs = abs(latitude_sul)
+        lat_abs = abs(20)
 
         # Arredonda para o múltiplo de 5 mais próximo
         lat_arredondada = round(lat_abs / 5) * 5
@@ -216,6 +439,67 @@ class CalculadorIrrigacao:
         eto = (0.457 * t_media + 8.13) * (p / 100)
         return round(eto, 2)
 
+
+    def obter_radiacao_ra_tabela(self, latitude_sul, mes_index):
+        MATRIZ_RA_SUL = {
+            70: [41.4, 28.6, 15.8, 4.9, 0.2, 0.0, 0.0, 2.2, 10.7, 23.5, 37.3, 45.3],
+            68: [41.0, 29.3, 16.9, 6.0, 0.8, 0.0, 0.0, 3.2, 11.9, 24.4, 37.4, 44.7],
+            66: [40.9, 30.0, 18.1, 7.2, 1.5, 0.1, 0.5, 4.2, 13.1, 25.4, 37.6, 44.1],
+            64: [41.0, 30.8, 19.3, 8.4, 2.4, 0.6, 1.2, 5.3, 14.4, 26.3, 38.0, 43.9],
+            62: [41.2, 31.5, 20.4, 9.6, 3.4, 1.2, 2.0, 6.4, 15.5, 27.2, 38.3, 43.9],
+            60: [41.5, 32.3, 21.5, 10.8, 4.4, 2.0, 2.9, 7.6, 16.7, 28.1, 38.7, 43.9],
+            58: [41.7, 33.0, 22.6, 12.0, 5.5, 2.9, 3.9, 8.7, 17.9, 28.9, 39.1, 44.0],
+            56: [42.0, 33.7, 23.6, 13.2, 6.6, 3.9, 4.9, 9.9, 19.0, 29.8, 39.5, 44.1],
+            54: [42.2, 34.3, 24.6, 14.4, 7.7, 4.9, 6.0, 11.1, 20.1, 30.6, 39.9, 44.3],
+            52: [42.5, 35.0, 25.6, 15.6, 8.8, 6.0, 7.1, 12.2, 21.2, 31.4, 40.2, 44.4],
+            50: [42.7, 35.6, 26.6, 16.7, 10.0, 7.1, 8.2, 13.4, 22.2, 32.1, 40.6, 44.5],
+            48: [42.9, 36.2, 27.5, 17.9, 11.1, 8.2, 9.3, 14.6, 23.3, 32.8, 40.9, 44.5],
+            46: [43.0, 36.7, 28.4, 19.0, 12.3, 9.3, 10.4, 15.7, 24.3, 33.5, 41.1, 44.6],
+            44: [43.2, 37.2, 29.3, 20.1, 13.5, 10.5, 11.6, 16.8, 25.2, 34.1, 41.4, 44.6],
+            42: [43.3, 37.7, 30.1, 21.2, 14.6, 11.6, 12.8, 18.0, 26.2, 34.7, 41.6, 44.6],
+            40: [43.4, 38.1, 30.9, 22.3, 15.8, 12.8, 13.9, 19.1, 27.1, 35.3, 41.8, 44.6],
+            38: [43.4, 38.5, 31.7, 23.3, 16.9, 13.9, 15.1, 20.2, 28.0, 35.8, 41.9, 44.5],
+            36: [43.4, 38.9, 32.4, 24.3, 18.1, 15.1, 16.2, 21.2, 28.8, 36.3, 42.0, 44.4],
+            34: [43.4, 39.2, 33.0, 25.3, 19.2, 16.2, 17.4, 23.3, 29.6, 36.7, 42.0, 44.3],
+            32: [43.3, 39.4, 33.7, 26.3, 20.3, 17.4, 18.5, 23.3, 30.4, 37.1, 42.0, 44.1],
+            30: [43.1, 39.6, 34.3, 27.2, 21.4, 18.5, 19.6, 24.3, 31.1, 37.5, 42.0, 43.9],
+            28: [43.0, 39.8, 34.8, 28.1, 22.5, 19.7, 20.7, 25.3, 31.8, 37.8, 41.9, 43.6],
+            26: [42.8, 39.9, 35.3, 29.0, 23.5, 20.8, 21.8, 26.3, 32.5, 38.0, 41.8, 43.3],
+            24: [42.5, 40.0, 35.8, 29.8, 24.6, 21.9, 22.9, 27.2, 33.1, 38.3, 41.7, 43.0],
+            22: [42.2, 40.1, 36.2, 30.6, 25.6, 23.0, 24.0, 28.1, 33.7, 38.4, 41.4, 42.6],
+            20: [41.9, 40.0, 36.6, 31.3, 26.6, 24.1, 25.0, 28.9, 34.2, 38.6, 41.2, 42.1],
+            18: [41.5, 40.0, 37.0, 32.1, 27.5, 25.1, 26.0, 29.8, 34.7, 38.7, 40.9, 41.7],
+            16: [41.1, 39.9, 37.2, 32.8, 28.5, 26.2, 27.0, 30.6, 35.2, 38.7, 40.6, 41.2],
+            14: [40.6, 39.7, 37.5, 33.4, 29.4, 27.2, 27.9, 31.3, 35.6, 38.7, 40.2, 40.6],
+            12: [40.1, 39.6, 37.7, 34.0, 30.2, 28.1, 28.9, 32.1, 36.0, 38.6, 39.8, 40.0],
+            10: [39.5, 39.3, 37.8, 34.6, 31.1, 29.1, 29.8, 32.8, 36.3, 38.5, 39.3, 39.4],
+            8:  [38.9, 39.0, 37.9, 35.1, 31.9, 30.0, 30.7, 33.4, 36.6, 38.4, 38.8, 38.7],
+            6:  [38.3, 38.7, 38.0, 35.6, 32.7, 30.9, 31.5, 34.0, 36.8, 38.2, 38.2, 38.0],
+            4:  [37.6, 38.3, 38.0, 36.0, 33.4, 31.8, 32.3, 34.6, 37.0, 38.0, 37.6, 37.2],
+            2:  [36.9, 37.9, 38.0, 36.4, 34.1, 32.6, 33.1, 35.2, 37.1, 37.7, 37.0, 36.4],
+            0:  [36.2, 37.5, 37.9, 36.8, 34.8, 33.4, 33.9, 35.7, 37.2, 37.4, 36.6, 35.6]
+        }
+
+        idx = mes_index - 1
+
+        if latitude_sul in MATRIZ_RA_SUL:
+            return round(MATRIZ_RA_SUL[latitude_sul][idx], 2)
+
+        lat_abs = abs(latitude_sul)
+        lat_abs = max(0.0, min(70.0, lat_abs))
+
+        lat_inferior = int(lat_abs / 2) * 2
+        lat_superior = lat_inferior + 2
+
+        if lat_superior > 70:
+            return round(MATRIZ_RA_SUL[70][idx], 2)
+
+        ra_inferior = MATRIZ_RA_SUL[lat_inferior][idx]
+        ra_superior = MATRIZ_RA_SUL[lat_superior][idx]
+
+        ra = ra_inferior + ((ra_superior - ra_inferior) / (lat_superior - lat_inferior)) * (lat_abs - lat_inferior)
+        return round(ra, 2)
+
     def calcular_eto_hargreaves(self, t_max, t_min, latitude, mes_index):
         """
         Calcula a Evapotranspiração de Referência (ETo em mm/dia) usando a equação
@@ -224,7 +508,7 @@ class CalculadorIrrigacao:
         t_media = (t_max + t_min) / 2
 
         # Usa a matriz baseada na Tabela 2 para obter a Radiação Solar (Ra)
-        ra = self.obter_radiacao_solar_ra(latitude, mes_index)
+        ra = self.obter_radiacao_ra_tabela(abs(latitude), mes_index)
 
         # Equação 10 da Tese: ETo = 0.0023 * Ra * 0.408 * (Tmedia + 17.8) * sqrt(Tmax - Tmin)
         term_temp = t_media + 17.8
@@ -232,6 +516,31 @@ class CalculadorIrrigacao:
 
         eto = 0.0023 * ra * 0.408 * term_temp * term_diff
         return round(eto, 2)
+
+
+    def calcular_e_circulo_ponto(self, t_temperatura):
+        import math
+        # Eq. 14: e°(T) = 0.6108 * exp([17.27 * T] / [T + 273.3])
+        # Nota: Siga rigorosamente o divisor (T + 273.3) impresso graficamente na página 49 da tese.
+        e_circulo = 0.6108 * math.exp((17.27 * t_temperatura) / (t_temperatura + 273.3))
+        return e_circulo
+
+    def calcular_pressao_saturacao_es(self, t_max, t_min):
+        # Eq. 13: es = [e°(Tmax) + e°(Tmin)] / 2
+        e_tmax = self.calcular_e_circulo_ponto(t_max)
+        e_tmin = self.calcular_e_circulo_ponto(t_min)
+        es = (e_tmax + e_tmin) / 2.0
+        return round(es, 4)
+
+    def calcular_pressao_atual_ea(self, es_calculado, ur_media):
+        # Eq. 15: ea = es * (URm / 100)
+        ea = es_calculado * (ur_media / 100.0)
+        return round(ea, 4)
+
+    def calcular_deficit_vapor(self, es_calculado, ea_calculado):
+        # Deficit = (es - ea)
+        deficit = es_calculado - ea_calculado
+        return round(deficit, 4)
 
     def calcular_eto_penman_monteith(self, rn, g, t_media, u2, es, ea, delta, gama):
         """
@@ -627,7 +936,20 @@ class CalculadorIrrigacao:
         """
         if espacamento_fileiras_sr <= 0:
             return 0.0
+        cad = 1000.0 * (float(theta_cc) - float(theta_pmp)) * float(z)
+        return round(cad, 2)
 
+    def calcular_irn_p58(self, cad, fator_f, pe=0.0, tipo_irrigacao='total'):
+        if tipo_irrigacao == 'total':
+            irn = float(cad) * float(fator_f)
+        elif tipo_irrigacao == 'suplementar':
+            irn = (float(cad) * float(fator_f)) - float(pe)
+        else:
+            irn = 0.0
+
+        if irn < 0.0:
+            irn = 0.0
+        return round(irn, 2)
         tipo_copa = tipo_copa.lower()
 
         if tipo_copa == 'faixa_continua':
@@ -674,15 +996,14 @@ class CalculadorIrrigacao:
 
         raise ValueError("O loop iterativo não estabilizou em três casas decimais.")
     def calcular_lmax_perfil_tipo_IIa(self, H, Hvar, So, k_linha, L_inicial=50.0):
-        """
-        Determina o Comprimento Máximo da Linha Lateral sob o Perfil Tipo II-a (Declive Fraco).
-        Utiliza o algoritmo de aproximações sucessivas baseado nas equações 59, 60 e 61 da tese.
-        """
         L = L_inicial
         iteracoes = 0
         max_iteracoes = 1000
 
         while iteracoes < max_iteracoes:
+            condicao = So / (k_linha * (L ** 1.75))
+            if not (0 < condicao < 1):
+                raise ValueError(f"Condição da Equação 59 não satisfeita (deve estar entre 0 e 1): {condicao}")
             razao = So / (k_linha * (L_atual ** 1.75))
             if razao < 2.75:
                 raise ValueError(f"Restrição de limite físico não atendida (Equação 66): S0 / (k' * L^1.75) = {razao:.4f} < 2.75. O ganho por desnível não supera totalmente a perda por atrito em todas as seções.")
@@ -747,10 +1068,7 @@ class CalculadorIrrigacao:
         if not (0 < condicao < 1):
             raise ValueError(f"Condição da Equação 59 não satisfeita (deve estar entre 0 e 1): {condicao}")
 
-            # Equação 61
             razao_lL = 1 - 0.56098 * (condicao ** 0.57143)
-
-            # Equação 60
             numerador = H * Hvar
             denominador = ((1 - ((1 - razao_lL) ** 2.35)) * k_linha * (L ** 1.33)) - (razao_lL * So)
 
@@ -759,17 +1077,69 @@ class CalculadorIrrigacao:
 
             L_novo = numerador / denominador
 
-            # Critério de paragem
             if abs(L_novo - L) < 0.001:
                 return round(L_novo, 3)
 
             L = L_novo
+            iteracoes += 1
 
         raise Exception("O cálculo não convergiu após o número máximo de iterações.")
 
+    def resolver_lmax_perfil_ii_c(self, pressao_h, h_var_fraction, k_linha, declividade_so, max_iter=300, tol=1e-4):
+        """
+        Solver iterativo para o Perfil Tipo II-c (Equação 65 - Pág. 71).
+        Utiliza o algoritmo de iteração de ponto fixo.
+        """
+        abs_so = abs(declividade_so)
+        if abs_so == 0.0:
+            return 0.0
+
+        L_n = 50.0  # Chute inicial
+
+        for _ in range(max_iter):
+            abs_l_n = abs(L_n)
+            k_L_175 = k_linha * (abs_l_n ** 1.75)
+
+            if k_L_175 == 0.0:
+                return 0.0
+
+            # Condição = |So| / (k' * L^1.75)
+            condicao = abs_so / k_L_175
+
+            # Equação 61
+            r_min = 1.0 - 0.56098 * (condicao ** 0.57143)
+
+            numerador = pressao_h * h_var_fraction
+
+            base_r_min = 1.0 - r_min
+            if base_r_min < 0:
+                base_r_min = 0.0
+
+            # Denominador da Eq 65:
+            denominador = (
+                abs_so
+                - k_L_175
+                - (r_min * abs_so)
+                + ((1.0 - (base_r_min ** 2.75)) * k_L_175)
+                - (pressao_h * h_var_fraction * (abs_so - k_L_175))
+            )
+
+            # Trava de Segurança matemática
+            if denominador == 0.0:
+                return 0.0
+
+            L_novo = abs(numerador / denominador)
+
+            if abs(L_novo - L_n) < tol:
+                return round(L_novo, 3)
+
+            L_n = 0.1 * L_novo + 0.9 * L_n
+
+        return round(L_n, 3)
+
     def classificar_perfil_pressao(self, So, k_linha, L_estimado):
         """
-        Classifica o perfil de pressão hidráulica baseado na tese.
+        Classifica o perfil de pressão hidráulica baseado na tese (Pág. 71).
         So: declividade em decimal
         k_linha: constante da linha
         L_estimado: comprimento estimado
@@ -778,7 +1148,7 @@ class CalculadorIrrigacao:
             return 'Perfil Tipo I (Aclive ou Nível)'
 
         J = k_linha * (L_estimado ** 1.75)
-        razao = So / J
+        razao = abs(So) / J
 
         if 0 < razao < 1:
             return 'Perfil Tipo IIa (Declive Fraco)'
@@ -1007,42 +1377,6 @@ class CalculadorIrrigacao:
                 melhor_d = d
 
         return melhor_d
-    def calcular_rn(self, t_max_c, t_min_c, ea, rs, rso, rns):
-        """
-        Calcula a Radiação de Onda Longa (Rnl) e o Saldo de Radiação (Rn)
-        utilizando o balanço de energia do modelo Penman-Monteith.
-        """
-        if rso <= 0:
-            return 0.0, 0.0
-
-        if ea < 0:
-            ea = 0.0
-
-        t_max_k = t_max_c + 273.16
-        t_min_k = t_min_c + 273.16
-        sigma = 4.903e-9
-
-        # Equação 19
-        termo_temperatura = (sigma * (t_max_k ** 4) + sigma * (t_min_k ** 4)) / 2.0
-        termo_umidade = 0.34 - 0.14 * math.sqrt(ea)
-        termo_nebulosidade = 1.35 * (rs / rso) - 0.35
-
-        r_nl = termo_temperatura * termo_umidade * termo_nebulosidade
-
-        # Equação 20
-        r_n = rns - r_nl
-
-        return r_nl, r_n
-    def calcular_rns(self, rs, ra, altitude_m):
-        """
-        Calcula a Radiação Solar de Céu Claro (Rso) e a Radiação Líquida de Onda Curta (Rns).
-        Equação 17: Rso = [0.75 + 2 * (Altitude / 100000)] * Ra
-        Equação 18: Rns = 0.77 * Rs
-        Mantém a unidade: MJ * m^-2 * d^-1
-        """
-        rso = (0.75 + 2 * (altitude_m / 100000)) * ra
-        rns = 0.77 * rs
-        return round(rso, 2), round(rns, 2)
     def calcular_constante_psicrometrica(self, altitude_z):
         """
         Calcula a Pressão Atmosférica (P) e a Constante Psicrométrica (γ)
@@ -1097,38 +1431,6 @@ class CalculadorIrrigacao:
             num_subunidades_sugeridas = math.floor(24.0 / ti_horas)
 
         return tr_max, ti_horas, num_subunidades_sugeridas
-    def calcular_raio_umedecido(self, alpha, q, ko, se):
-        """
-        Calcula o raio umedecido (Rw) pela Equação 26 e verifica se a faixa contínua é rompida.
-        """
-        import math
-
-        if alpha <= 0 or ko <= 0:
-            return {"erro": "Alpha e Ko devem ser maiores que zero."}
-
-        term1 = 4 / ((alpha**2) * (math.pi**2))
-        term2 = q / (math.pi * ko)
-        term3 = 2 / (alpha * math.pi)
-
-        inside_sqrt = term1 + term2 - term3
-
-        if inside_sqrt < 0:
-            return {"erro": "Valores resultam em raiz quadrada negativa."}
-
-        rw = math.sqrt(inside_sqrt)
-
-        alerta = False
-        mensagem = ""
-
-        if se > (2 * rw):
-            alerta = True
-            mensagem = "Afastamento excessivo entre gotejadores. A faixa contínua de humidade será rompida, prejudicando as raízes."
-
-        return {
-            "rw": round(rw, 4),
-            "alerta_faixa_descontinua": alerta,
-            "mensagem": mensagem
-        }
     def calcular_raio_umedecido(self, alpha, q, ko, se=None):
         """
         Calcula o Raio Umedecido (Rw) para faixa contínua baseado na Equação 26.
@@ -1242,3 +1544,400 @@ class CalculadorIrrigacao:
         """
         h_seguinte = h_anterior - hf_trecho + delta_z
         return round(h_seguinte, 4)
+    def calcular_ponto_pressao_minima_ratio(self, declividade_so, k_linha, comprimento_l):
+        import math
+        declividade_abs = abs(declividade_so)
+        atrito_total = k_linha * math.pow(comprimento_l, 1.75)
+        if atrito_total <= 0: return 1.0
+        razao = declividade_abs / atrito_total
+        ratio = 1.0 - 0.56098 * math.pow(razao, 0.57143)
+        return max(0.0, min(1.0, ratio))
+
+    def refinar_lmax_perfil_ii_a(self, pressao_h, h_var_fraction, k_linha, declividade_so, max_iter=200, tol=1e-4):
+        import math
+        L = 100.0
+        for _ in range(max_iter):
+            r_min = self.calcular_ponto_pressao_minima_ratio(declividade_so, k_linha, L)
+            base_potencia = 1.0 - r_min
+            denominador_atrito = (1.0 - math.pow(abs(base_potencia), 2.75)) * k_linha * math.pow(abs(L), 1.75)
+            denominador_gravidade = r_min * abs(declividade_so)
+            denominador = denominador_atrito - denominador_gravidade
+            if denominador <= 0: return 0.0
+            L_novo = (pressao_h * h_var_fraction) / denominador
+            if abs(L_novo - L) <= tol: return round(L_novo, 3)
+            L = L_novo
+        return round(L, 3)
+
+    def classificar_dimensionar_perfil_ii_b(self, pressao_h, h_var_fraction, k_linha, declividade_so, L_estimado):
+        import math
+        so_abs = abs(declividade_so)
+        if so_abs == 0: return 0.0
+        razao = (k_linha * math.pow(L_estimado, 1.75)) / so_abs
+        if math.isclose(razao, 1.0, rel_tol=1e-2):
+            l_max = (pressao_h * h_var_fraction) / (0.357 * so_abs)
+            return round(l_max, 3)
+        return None
+    def calcular_cad(self, theta_cc, theta_pmp, z):
+        if theta_cc <= theta_pmp or z <= 0:
+            return 0.0
+        return 1000.0 * (theta_cc - theta_pmp) * z
+
+    def calcular_irn_balanco(self, cad, fator_f, pe=0.0, tipo_irrigacao='total'):
+        if tipo_irrigacao == 'total':
+            irn = cad * fator_f
+        elif tipo_irrigacao == 'suplementar':
+            irn = (cad * fator_f) - pe
+        else:
+            irn = cad * fator_f
+
+        return max(0.0, irn)
+
+    def calcular_turno_rega_maximo(self, irn_max, etc):
+        if etc <= 0:
+            return 1
+        tr = int(irn_max / etc)
+        return max(1, tr)
+    def validar_limites_conector_zitterell(self, die, dis, lc, dt, vt, reynolds):
+        '''
+        Validador de Fronteiras de Zitterell (Limites de Validade - Pág. 74)
+        '''
+        alertas = []
+        if not (2.318 <= die <= 7.900):
+            alertas.append(f"Die fora da faixa: {die} mm")
+        if not (2.318 <= dis <= 12.006):
+            alertas.append(f"Dis fora da faixa: {dis} mm")
+        if not (21.483 <= lc <= 65.046):
+            alertas.append(f"Lc fora da faixa: {lc} mm")
+        if not (4.050 <= dt <= 12.854):
+            alertas.append(f"Dt fora da faixa: {dt} mm")
+        if not (0.363 <= vt <= 7.580):
+            alertas.append(f"Vt fora da faixa: {vt} m/s")
+        if not (2405.599 <= reynolds <= 66670.140):
+            alertas.append(f"Reynolds fora da faixa: {reynolds}")
+
+        return {
+            'valido': len(alertas) == 0,
+            'alertas': alertas
+        }
+
+    def orquestrar_dimensionamento_derivacao(self, declividade, h_pressao, l_comprimento, ql_vazao, sl_espacamento, sl1_distancia, hvar_limite):
+        '''
+        Orquestrador de Topografia da Linha de Derivação (Seção 3.10 - Pág. 74)
+        '''
+        estrategia = 'Método da Divisão em Trechos' if declividade < 0 else 'Critério de Único Diâmetro'
+        return {
+            'entradas': {
+                'declividade_derivacao': declividade,
+                'pressao_entrada_h': h_pressao,
+                'comprimento_total_l': l_comprimento,
+                'vazao_ql': ql_vazao,
+                'espacamento_sl': sl_espacamento,
+                'distancia_sl1': sl1_distancia,
+                'variacao_hvar': hvar_limite
+            },
+            'estrategia_dimensionamento': estrategia
+    def calcular_et_consorcio(self, eto, kl, lista_culturas):
+        """
+        Calcula a Evapotranspiração para Consórcio de Culturas da Agricultura Familiar.
+
+        Args:
+            eto (float): Evapotranspiração de Referência (mm/dia).
+            kl (float): Coeficiente de Localização.
+            lista_culturas (list): Lista de dicionários com 'kc' e 'fracao_area'.
+
+        Returns:
+            float: Evapotranspiração do consórcio combinada (mm/dia).
+        """
+        if not lista_culturas:
+            return 0.0
+
+        soma_fracoes = sum(c.get('fracao_area', 0) for c in lista_culturas)
+
+        # Trava de Segurança: Normalização se não somar 1.0 (com tolerância)
+        if abs(soma_fracoes - 1.0) > 0.01:
+            for c in lista_culturas:
+                if soma_fracoes > 0:
+                    c['fracao_area'] = c.get('fracao_area', 0) / soma_fracoes
+                else:
+                    c['fracao_area'] = 1.0 / len(lista_culturas)
+
+        # Calcula Kc consórcio
+        kc_consorcio = sum(c.get('kc', 0) * c.get('fracao_area', 0) for c in lista_culturas)
+
+        # Clampeia ao máximo de 1.30
+        kc_consorcio = min(kc_consorcio, 1.30)
+
+        # ETc combinada localizada
+        etc_consorcio = eto * kc_consorcio * kl
+
+        return round(etc_consorcio, 3)
+
+    def simular_autonomia_cisterna(self, volume_atual, capacidade_max, area_irrigada_m2, lamina_itn_mm, precipitacao_mm, area_captacao_m2, coeficiente_escoamento=0.90):
+        """
+        Simulador Dinâmico de Autonomia de Cisterna.
+        """
+        import math
+        volume_entrada = precipitacao_mm * area_captacao_m2 * coeficiente_escoamento
+        volume_saida = lamina_itn_mm * area_irrigada_m2
+
+        volume_final = volume_atual + volume_entrada - volume_saida
+
+        # Trava física
+        volume_final = max(0.0, min(volume_final, capacidade_max))
+
+        if volume_saida <= 0:
+            autonomia_dias = 999.0
+        else:
+            autonomia_dias = volume_final / volume_saida
+
+        return {
+            "volume_final_l": round(volume_final, 2),
+            "autonomia_dias": round(autonomia_dias, 1)
+        }
+
+    def escalonar_setores_familiar(self, q_bomba_lh, lista_setores_vazao_lh):
+        """
+        Orquestrador de Escalonamento de Pequenas Bombas.
+        """
+        import math
+        vazao_total = sum(lista_setores_vazao_lh)
+
+        if vazao_total <= 0 or q_bomba_lh <= 0:
+            return {"turnos_bomba": 0, "vazao_total_lh": vazao_total}
+
+        if vazao_total <= q_bomba_lh:
+            turnos = 1
+        else:
+            turnos = math.ceil(vazao_total / q_bomba_lh)
+
+        return {
+            "turnos_bomba": turnos,
+            "vazao_total_lh": round(vazao_total, 2)
+    def resolver_lmax_perfil_iii(self, pressao_h, h_var_fraction, k_linha, declividade_so, max_iter=300, tol=1e-4):
+        """
+        Solver Iterativo Numérico para o Perfil Tipo III (Equação 67 - Pág. 72).
+        L_n+1 = (H * H_var) / ((So - k' * L_n^1.75) * (1 - H_var))
+        """
+        So = abs(declividade_so)
+        L_n = 1.0 # Chute inicial seguro
+
+        for iteracao in range(max_iter):
+            abs_L = abs(L_n)
+            denominador = (So - k_linha * (abs_L ** 1.75)) * (1.0 - h_var_fraction)
+
+            # Trava de Segurança
+            if denominador <= 0:
+                return 0.0
+
+            L_novo = (pressao_h * h_var_fraction) / denominador
+
+            if abs(L_novo - L_n) < tol:
+                return round(L_novo, 3)
+
+            L_n = L_novo
+
+        return round(L_n, 3)
+
+    def orquestrar_comprimento_declive(self, pressao_h, h_var_fraction, k_linha, declividade_so):
+        """
+        Orquestrador Mestre de Linhas em Declive (Algoritmo Sequencial da Pág. 72).
+        Árvore sequencial de fallbacks: Tipo II-a -> II-b -> II-c -> II-d -> Tipo III
+        """
+        # Tentativa 1: Perfil Tipo II-a
+        try:
+            l_iia = self.calcular_lmax_perfil_tipo_IIa(pressao_h, h_var_fraction, abs(declividade_so), k_linha)
+            if l_iia is not None:
+                return l_iia, 'Perfil Tipo II-a'
+        except Exception:
+            pass
+
+        # Tentativa 2: Perfil Tipo II-b
+        try:
+            # We need an estimated L for IIb, we use a basic guess
+            l_iib = self.calcular_lmax_perfil_tipo_IIb(pressao_h, h_var_fraction, abs(declividade_so), k_linha, L_estimado=50.0)
+            if l_iib is not None:
+                return l_iib, 'Perfil Tipo II-b'
+        except Exception:
+            pass
+
+        # Tentativa 3: Perfil Tipo II-c
+        try:
+            l_iic = self.calcular_lmax_perfil_tipo_IIc(pressao_h, h_var_fraction, abs(declividade_so), k_linha)
+            if l_iic is not None:
+                return l_iic, 'Perfil Tipo II-c'
+        except Exception:
+            pass
+
+        # Tentativa 4: Perfil Tipo II-d
+        try:
+            l_iid = self.calcular_lmax_perfil_tipo_IId(pressao_h, h_var_fraction, abs(declividade_so), k_linha)
+            if l_iid is not None:
+                return l_iid, 'Perfil Tipo II-d'
+        except Exception:
+            pass
+
+        # Solução Final: Perfil Tipo III
+        l_iii = self.resolver_lmax_perfil_iii(pressao_h, h_var_fraction, k_linha, declividade_so)
+        return l_iii, 'Perfil Tipo III'
+
+    def orquestrar_etc_figura_8(self, modelo, eto, kc, pw_valor, ps_valor):
+        p_percent = max(float(pw_valor), float(ps_valor))
+        p_decimal = p_percent / 100.0
+
+        if modelo == 'fereres_1981':
+            if p_decimal <= 0.20:
+                kl = 1.94 * p_decimal + 0.10
+            elif p_decimal < 0.65:
+                kl = 1.09 * p_decimal + 0.30
+            else:
+                kl = 1.0
+        else:
+            kl = p_decimal
+
+        kl_final = max(0.0, min(1.0, kl))
+        etc = float(eto) * float(kc) * kl_final
+        return round(etc, 3)
+
+    def calcular_cad_solo(self, theta_cc, theta_pmp, profundidade_z):
+        if float(theta_cc) <= float(theta_pmp) or float(profundidade_z) <= 0:
+            return 0.0
+        cad = (float(theta_cc) - float(theta_pmp)) * float(profundidade_z) * 1000.0
+        return round(cad, 2)
+
+    def calcular_irn_e_turno_rega(self, cad, fator_f, etc, precipitacao_efetiva=0.0):
+        raw = float(cad) * float(fator_f)
+
+        if float(etc) <= 0:
+            turno_rega = 1
+        else:
+            turno_rega = math.floor(raw / float(etc))
+            if turno_rega < 1:
+                turno_rega = 1
+
+        irn = float(etc) - float(precipitacao_efetiva)
+        if irn < 0:
+            irn = 0.0
+
+        return {
+            "cad": round(float(cad), 2),
+            "raw": round(raw, 2),
+            "turno_rega": int(turno_rega),
+            "irn": round(irn, 2)
+    TABELA_STEFAN_BOLTZMANN = { 1.0: 27.70, 1.5: 27.90, 2.0: 28.11, 2.5: 28.31, 3.0: 28.52, 3.5: 28.72, 4.0: 28.93, 4.5: 29.14, 17.0: 34.75, 17.5: 34.99, 18.0: 35.24, 18.5: 35.48, 19.0: 35.72, 19.5: 35.97, 20.0: 36.21, 20.5: 36.46, 33.0: 43.08, 33.5: 43.36, 34.0: 43.64, 34.5: 43.93, 35.0: 44.21, 35.5: 44.50, 36.0: 44.79, 36.5: 45.08 }
+
+    def obter_stefan_boltzmann(self, t_celsius):
+        t = float(t_celsius)
+        chaves = sorted(self.TABELA_STEFAN_BOLTZMANN.keys())
+        if t <= chaves[0]: return self.TABELA_STEFAN_BOLTZMANN[chaves[0]]
+        if t >= chaves[-1]: return self.TABELA_STEFAN_BOLTZMANN[chaves[-1]]
+        for i in range(len(chaves) - 1):
+            if chaves[i] <= t <= chaves[i+1]:
+                x0, y0 = chaves[i], self.TABELA_STEFAN_BOLTZMANN[chaves[i]]
+                x1, y1 = chaves[i+1], self.TABELA_STEFAN_BOLTZMANN[chaves[i+1]]
+                return y0 + (y1 - y0) * (t - x0) / (x1 - x0)
+        return 0.0
+
+    def calcular_rso(self, altitude, ra):
+        return (0.75 + 2 * (altitude / 100000.0)) * ra
+
+    def calcular_rns(self, rs):
+        return 0.77 * rs
+
+    def calcular_rnl(self, t_max, t_min, ea, rs, rso):
+        import math
+        stefan_max = self.obter_stefan_boltzmann(t_max)
+        stefan_min = self.obter_stefan_boltzmann(t_min)
+        termo_temperatura = (stefan_max + stefan_min) / 2.0
+        termo_umidade = 0.34 - 0.14 * math.sqrt(max(0, ea))
+        razao = 1.0 if rso <= 0.0 else (rs / rso)
+        termo_nebulosidade = 1.35 * razao - 0.35
+        return termo_temperatura * termo_umidade * termo_nebulosidade
+
+    def calcular_rn(self, rns, rnl):
+        return rns - rnl
+    def calcular_diametro_dw_schwartzman(self, z_profundidade, q_vazao, ko_condutividade):
+        """
+        Equação 25 (Diâmetro Máximo Molhado - Dw)
+        Dw = 1.32 * z^0.35 * (q / ko)^0.33
+        """
+        if ko_condutividade <= 0:
+            return 0.0
+
+        if z_profundidade < 0 or q_vazao < 0:
+            return 0.0
+
+        dw = 1.32 * (z_profundidade ** 0.35) * ((q_vazao / ko_condutividade) ** 0.33)
+        return round(dw, 4)
+
+    def calcular_raio_rw(self, alpha, q_vazao, ko_condutividade):
+        """
+        Equação 26 (Raio Molhado Saturado - Rw)
+        Rw = sqrt(4 / (alpha^2 * pi^2) + q / (pi * ko)) - 2 / (alpha * pi)
+        """
+        import math
+        if alpha <= 0 or ko_condutividade <= 0:
+            return 0.0
+        if q_vazao < 0:
+            return 0.0
+
+        termo1 = 4.0 / ((alpha ** 2) * (math.pi ** 2))
+        termo2 = q_vazao / (math.pi * ko_condutividade)
+        termo3 = 2.0 / (alpha * math.pi)
+
+        valor_interno = termo1 + termo2
+        if valor_interno < 0:
+            return 0.0
+
+        rw = math.sqrt(valor_interno) - termo3
+
+        if rw < 0:
+            return 0.0
+
+        return round(rw, 4)
+
+    def calcular_area_umedecida_fluxograma(self, tipo_disposicao, configuracao_linha, params):
+        """
+        Método orquestrador baseado na Figura 6 da tese.
+        """
+        import math
+        z = params.get('profundidade_z', 0.0)
+        q = params.get('q_vazao', 0.0)
+        ko = params.get('condutividade_ko', 0.0)
+        alpha = params.get('parametro_alpha', 0.0)
+        sp = params.get('espacamento_plantas_sp', 0.0)
+        sr = params.get('espacamento_fileiras_sr', 0.0)
+        np_emissores = params.get('np_emissores', 1)
+
+        dw = self.calcular_diametro_dw_schwartzman(z, q, ko)
+        rw = self.calcular_raio_rw(alpha, q, ko)
+
+        if sp <= 0 or sr <= 0:
+            return {
+                "dw": dw, "rw": rw, "aw": 0.0, "ap": 0.0, "pw": 0.0,
+                "erro": "Espaçamentos devem ser maiores que zero."
+            }
+
+        ap = sp * sr
+        aw = 0.0
+
+        if tipo_disposicao == 'faixa_continua':
+            largura_faixa = dw
+            if configuracao_linha == 'LLD':
+                largura_faixa *= 2
+            aw = largura_faixa * sp
+
+        elif tipo_disposicao == 'por_arvore':
+            area_bulbo_individual = math.pi * (rw ** 2)
+            aw = np_emissores * area_bulbo_individual
+            if configuracao_linha == 'LLD':
+                aw *= 2
+
+        pw = (aw / ap) * 100
+
+        return {
+            "dw": round(dw, 2),
+            "rw": round(rw, 2),
+            "aw": round(aw, 2),
+            "ap": round(ap, 2),
+            "pw": round(pw, 2)
+        }
