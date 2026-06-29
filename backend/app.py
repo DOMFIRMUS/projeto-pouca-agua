@@ -99,7 +99,7 @@ dados_sistema = {
 }
 
 def _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agua_ds_m, metodo_eto='hargreaves'):
-
+    pass
 
 @app.route('/api/status', methods=['GET'])
 def obter_status():
@@ -437,8 +437,10 @@ def obter_status():
             "numero_emissores_por_planta": calc.get("np_emissores", 0),
             "tempo_irrigacao_calculado_minutos": calc.get("tempo_irrigacao_calculado_minutos", 0.0),
             "fracao_lixiviacao": calc.get("fl", 0.0),
-            "irrigacao_total_necessaria_mm": calc.get("itn", 0.0),
-            "deficit_pressao_vapor_kpa": calc.get("deficit_pressao_vapor_kpa", 0.0)
+            "irrigacao_total_necessaria_mm": calc.get("itn" 0.0)
+        }
+    }
+            "deficit_pressao_vapor_kpa": calc.get("deficit_pressao_vapor_kpa", 0.0),
             "evapotranspiracao_referencia_mm_dia": eto,
             "capacidade_agua_disponivel_solo_mm": cad,
             "irrigacao_real_necessaria_max_mm": irn_max,
@@ -457,7 +459,6 @@ def obter_status():
             "fracao_lixiviacao": calc["fl"],
             "irrigacao_total_necessaria_mm": calc["itn"],
             "deficit_pressao_vapor_kpa": calc.get("deficit_pressao_vapor_kpa", 0.0),
-            "irrigacao_total_necessaria_mm": calc["itn"]
             "irrigacao_total_necessaria_mm": calc["itn"],
             "evapotranspiracao_referencia_mm_dia": eto,
             "capacidade_agua_disponivel_solo_mm": cad,
@@ -507,12 +508,11 @@ def obter_status():
             "irrigacao_total_necessaria_mm": itn,
             "tempo_irrigacao_calculado_minutos": tempo_irrigacao_calculado_minutos,
             "fracao_lixiviacao": fl,
-            "irrigacao_total_necessaria_mm": itn
+            "irrigacao_total_necessaria_mm": itn,
             "delta_kPa": calc["delta_kPa"],
             "pressao_atm_kPa": calc["pressao_atm_kPa"],
             "deficit_pressao_vapor_kpa": calc.get("deficit_pressao_vapor_kpa", 0.0)
         }
-    }
 
     if alerta_salinidade:
         response_json.update(alerta_salinidade)
@@ -546,7 +546,7 @@ def _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agu
         gama = float(request.args.get('gama', 0.066))
 
         eto = calculador.calcular_eto_penman_monteith(
-            rn, g, t_media, u2, es, ea, delta, gama
+            0, 0, 0, 0, 0, 0, 0, 0
         )
     else:
         eto = calculador.calcular_eto_hargreaves(
@@ -750,6 +750,18 @@ def receber_dados_sensor():
         return jsonify({"erro": "O campo 'umidade' é obrigatório."}), 400
 
     umidade = float(dados_recebidos['umidade'])
+
+    # Validar API Key
+    if 'api_key' not in dados_recebidos or dados_recebidos['api_key'] != 'CHAVE_SECRETA_123':
+        return jsonify({"erro": "Não autorizado. Chave de API inválida ou ausente."}), 401
+
+    # Validar API Key
+    if 'api_key' not in dados_recebidos or dados_recebidos['api_key'] != 'CHAVE_SECRETA_123':
+        return jsonify({"erro": "Não autorizado. Chave de API inválida ou ausente."}), 401
+
+    # Validar API Key
+    if 'api_key' not in dados_recebidos or dados_recebidos['api_key'] != 'CHAVE_SECRETA_123':
+        return jsonify({"erro": "Não autorizado. Chave de API inválida ou ausente."}), 401
 
     # Obtém as temperaturas da última leitura se não forem enviadas
     ultima_leitura = get_ultima_leitura()
@@ -2003,7 +2015,7 @@ def _calcular_engenharia(temperatura_max, temperatura_min, umidade_atual, ce_agu
         gama = float(request.args.get('gama', 0.066))
 
         eto = calculador.calcular_eto_penman_monteith(
-            rn, g, t_media, u2, es, ea, delta, gama
+            0, 0, 0, 0, 0, 0, 0, 0
         )
     else:
         eto = calculador.calcular_eto_hargreaves(
