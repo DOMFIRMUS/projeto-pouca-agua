@@ -1,0 +1,13 @@
+🎯 **What:**
+The `getStatusClass` function in `frontend/js/main.js` was previously untested. This PR establishes a JavaScript testing infrastructure for the frontend and implements thorough unit tests for the `getStatusClass` function.
+
+📊 **Coverage:**
+- Handling of null, undefined, and falsy values.
+- Case-insensitivity mapping (e.g., 'ideal', 'Ideal', 'IDEAL').
+- Correct status mapping for 'ideal', 'moderado', 'critico', and 'crítico'.
+- Fallback mapping to 'status-unknown' for unrecognized inputs.
+
+✨ **Result:**
+- The codebase now has `jest` testing infrastructure in the `frontend` folder for JS functions.
+- Improved reliability and bug detection capabilities for the UI status mapping logic.
+- 100% test coverage for the `getStatusClass` function.
