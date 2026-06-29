@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciar Culturas - Projeto Pouca Água</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/bancos.css">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Pouca Água</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li><a href="index.html">Dashboard</a></li>
+                    <li><a href="bancos.html">Bancos</a></li>
+                    <li><a href="culturas.html" class="active">Culturas</a></li>
+                    <li><a href="profile.html">Perfil</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <h1>Gerenciamento de Culturas</h1>
+            </header>
+
+            <section class="card table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Nome da Cultura</th>
+                            <th>Kc (Inicial/Média/Final)</th>
+                            <th>Dias (Ini/Meio/Fim)</th>
+                            <th>Limites CE (Min - Max)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="culturas-tbody">
+                        <tr>
+                            <td colspan="4" class="text-center">Carregando culturas...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+        </main>
+    </div>
+
+    <script src="js/culturas.js"></script>
+</body>
+</html>
