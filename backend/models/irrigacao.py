@@ -4,6 +4,8 @@ import math
 class CalculadorIrrigacao:
     def calcular_cad(self, theta_cc, theta_pmp, z):
         if float(theta_cc) < float(theta_pmp) or float(z) <= 0:
+            return 0.0
+        return (float(theta_cc) - float(theta_pmp)) * float(z) * 1000.0
 
     def calcular_fator_atrito_p66(self, reynolds_r):
         """
