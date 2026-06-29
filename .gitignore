@@ -1,2 +1,4 @@
 __pycache__/
 backend/pouca_agua.db
+node_modules/
+frontend/node_modules/
