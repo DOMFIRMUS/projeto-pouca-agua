@@ -1460,6 +1460,22 @@ class CalculadorIrrigacao:
 
         return resultado
 
+    def calcular_irrigacao_total_necessaria_itn(self, irn, cei, cee, eap=100.0):
+        if irn <= 0:
+            return 0.0
+
+        if cee <= 0 or (5 * cee - cei) <= 0:
+            fl = 0.0
+        else:
+            fl = cei / (5 * cee - cei)
+
+        fl = min(fl, 0.40)
+
+        if fl >= 1.0:
+            return round(irn, 3)
+
+        itn = irn / ((1.0 - fl) * (eap / 100.0))
+        return round(itn, 3)
 
 
     def calcular_constante_psicrometrica_gamma(self, pressao_p):

@@ -12,7 +12,39 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+
+def salvar_itn(codigo_projeto, cei, cee, fl_calculada, itn_final):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE projetos_metadados SET cei = ?, cee = ?, fl_calculada = ?, itn_final = ? WHERE codigo_projeto = ?", (cei, cee, fl_calculada, itn_final, codigo_projeto))
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        print(f"Database error in salvar_itn: {e}")
+        return False
+    finally:
+        conn.close()
+
+def buscar_fator_f_cultura(nome_cultura):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT fator_f FROM culturas WHERE LOWER(nome) = LOWER(?)", (nome_cultura,))
+        row = cursor.fetchone()
+        return row[0] if row else 0.50
+    except:
+        return 0.50
+    finally:
+        conn.close()
+
 def init_db():
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS historico_leitura (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
     conn = sqlite3.connect("irrigacao.db")
     cursor = conn.cursor()
     cursor.execute("""
@@ -125,6 +157,10 @@ cursor.execute('''
             dias_fase_inicial INTEGER,
             dias_meia_estacao INTEGER,
             dias_fase_final INTEGER,
+            min_ce REAL DEFAULT 1.0,
+            max_ce REAL DEFAULT 3.0,
+            fator_f REAL DEFAULT 0.50
+        )
 
             min_ce REAL DEFAULT 1.0,
             max_ce REAL DEFAULT 3.0,
@@ -170,6 +206,10 @@ cursor.execute('''
             nome_propriedade TEXT,
             nome_proprietario TEXT,
             nome_projetista TEXT,
+            identificacao TEXT,
+            nome_codigo_subunidade TEXT,
+            area_total_irrigada REAL,
+            area_subunidade REAL,
             codigo_subunidade TEXT,
             area_total_irrigada REAL,
             area_subunidade REAL,
@@ -339,6 +379,8 @@ def inserir_trechos_derivacao(codigo_projeto, trechos_db_formatados):
     conn.commit()
     conn.close()
 
+    seed_culturas()
+
 def salvar_dados_solo_p58(codigo, f, pe, tipo, cad, irn):
 def vincular_cultura_projeto(codigo_projeto, cultura_id, estagio_selecionado):
     conn = get_db_connection()
@@ -377,6 +419,7 @@ def update_area_sombreada_projeto(codigo_projeto, ps, tipo_calculo, ss_largura_f
     conn.close()
 
 
+def insert_projeto(codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao):
 
 
     cursor.execute('''
@@ -432,7 +475,7 @@ def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, prof
             INSERT INTO projetos_metadados (
                 codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario,
                 nome_projetista, identificacao, nome_codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             codigo_projeto,
             nome_projeto,
@@ -446,6 +489,10 @@ def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, prof
             data_elaboracao
         ))
         row_id = cursor.lastrowid
+        conn.commit()
+        return {"status": "sucesso", "id": row_id}
+    except sqlite3.IntegrityError:
+        return {"status": "erro", "mensagem": "Já existe um projeto com este código. O código do projeto deve ser único."}
     except Exception:
         cursor.execute("""
             INSERT INTO projetos_metadados (
@@ -471,6 +518,57 @@ def insert_projeto_metadados(codigo_projeto, nome_projeto, largura, altura, prof
         conn.close()
 
 def get_projeto_metadados(codigo_projeto):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM projetos_metadados WHERE codigo_projeto = ?', (codigo_projeto,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return None
+
+def seed_culturas():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*) FROM culturas')
+    count = cursor.fetchone()[0]
+    if True:
+        culturas = [
+            ('Tomate tutorado', 0.60, 1.20, 0.90, '2023-09-01', 30, 40, 30, 1.0, 3.0, 0.40),
+            ('Alface', 0.70, 1.00, 0.95, '2023-09-15', 20, 30, 15, 1.0, 3.0, 0.30),
+            ('Batata', 0.50, 1.15, 0.75, '2023-08-20', 25, 30, 30, 1.0, 3.0, 0.35),
+            ('Cebola seca', 0.70, 1.05, 0.75, '2023-08-10', 15, 25, 20, 1.0, 3.0, 0.25),
+            ('Milho', 0.30, 1.20, 0.35, '2023-07-01', 20, 35, 30, 1.0, 3.0, 0.50),
+            ('Melancia', 0.40, 1.00, 0.75, '2023-09-05', 20, 30, 20, 1.0, 3.0, 0.50)
+        ]
+        cursor.executemany("""
+            INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce, fator_f)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, culturas)
+        conn.commit()
+    conn.close()
+
+def get_culturas():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce, fator_f FROM culturas ORDER BY nome')
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def insert_cultura(nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce=1.0, max_ce=3.0, fator_f=0.50):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO culturas (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce, fator_f)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (nome, kc_inicial, kc_media, kc_final, data_plantio, dias_fase_inicial, dias_meia_estacao, dias_fase_final, min_ce, max_ce, fator_f))
+    row_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return row_id
+
+def insert_leitura(umidade, temperatura_max, temperatura_min, eto_calculada=0.0, cad_calculada=0.0, irn_calculada=0.0, comprimento_lateral_m=0.0, perda_carga_total_mca=0.0, codigo_projeto=None):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM projetos_metadados WHERE codigo_projeto = ?', (codigo_projeto,))
