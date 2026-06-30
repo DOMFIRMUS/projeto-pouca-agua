@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 import math
+import datetime
 
 class CalculadorIrrigacao:
     def calcular_cad(self, theta_cc, theta_pmp, z):
         if float(theta_cc) < float(theta_pmp) or float(z) <= 0:
+            return 0.0
 
     def calcular_fator_atrito_p66(self, reynolds_r):
         """
@@ -387,10 +389,6 @@ class CalculadorIrrigacao:
         """
         return round(es - ea, 4)
 
-    def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=-22.0):
-    def calcular_eto_blaney_criddle(self, t_media, mes_index):
-        pass
-        pass
     def calcular_eto_blaney_criddle(self, t_media, mes_index, latitude_sul=20.0):
         """
         Baseado na Tabela 3 - Percentagem diária de horas anuais de luz solar (P) para Latitude Sul.
@@ -936,8 +934,17 @@ class CalculadorIrrigacao:
         """
         if espacamento_fileiras_sr <= 0:
             return 0.0
-        cad = 1000.0 * (float(theta_cc) - float(theta_pmp)) * float(z)
-        return round(cad, 2)
+        if tipo_copa == 'faixa_continua':
+            if largura_faixa_ss is None:
+                return 0.0
+            ps = (float(largura_faixa_ss) / float(espacamento_fileiras_sr)) * 100
+        elif tipo_copa == 'diametro_copa':
+            if diametro_copa_dco is None or espacamento_plantas_sp <= 0:
+                return 0.0
+            ps = ((math.pi * (float(diametro_copa_dco)**2)) / (4 * float(espacamento_plantas_sp) * float(espacamento_fileiras_sr))) * 100
+        else:
+            return 0.0
+        return min(max(round(ps, 2), 0.0), 100.0)
 
     def calcular_irn_p58(self, cad, fator_f, pe=0.0, tipo_irrigacao='total'):
         if tipo_irrigacao == 'total':
@@ -1693,6 +1700,7 @@ class CalculadorIrrigacao:
                 'variacao_hvar': hvar_limite
             },
             'estrategia_dimensionamento': estrategia
+        }
     def calcular_et_consorcio(self, eto, kl, lista_culturas):
         """
         Calcula a Evapotranspiração para Consórcio de Culturas da Agricultura Familiar.
@@ -1770,6 +1778,7 @@ class CalculadorIrrigacao:
         return {
             "turnos_bomba": turnos,
             "vazao_total_lh": round(vazao_total, 2)
+        }
     def resolver_lmax_perfil_iii(self, pressao_h, h_var_fraction, k_linha, declividade_so, max_iter=300, tol=1e-4):
         """
         Solver Iterativo Numérico para o Perfil Tipo III (Equação 67 - Pág. 72).
@@ -1859,7 +1868,6 @@ class CalculadorIrrigacao:
         if float(theta_cc) <= float(theta_pmp) or float(profundidade_z) <= 0:
             return 0.0
         cad = (float(theta_cc) - float(theta_pmp)) * float(profundidade_z) * 1000.0
-        return round(cad, 2)
 
     def calcular_irn_e_turno_rega(self, cad, fator_f, etc, precipitacao_efetiva=0.0):
         raw = float(cad) * float(fator_f)
@@ -1880,6 +1888,7 @@ class CalculadorIrrigacao:
             "raw": round(raw, 2),
             "turno_rega": int(turno_rega),
             "irn": round(irn, 2)
+        }
     TABELA_STEFAN_BOLTZMANN = { 1.0: 27.70, 1.5: 27.90, 2.0: 28.11, 2.5: 28.31, 3.0: 28.52, 3.5: 28.72, 4.0: 28.93, 4.5: 29.14, 17.0: 34.75, 17.5: 34.99, 18.0: 35.24, 18.5: 35.48, 19.0: 35.72, 19.5: 35.97, 20.0: 36.21, 20.5: 36.46, 33.0: 43.08, 33.5: 43.36, 34.0: 43.64, 34.5: 43.93, 35.0: 44.21, 35.5: 44.50, 36.0: 44.79, 36.5: 45.08 }
 
     def obter_stefan_boltzmann(self, t_celsius):
@@ -1998,3 +2007,14 @@ class CalculadorIrrigacao:
             "ap": round(ap, 2),
             "pw": round(pw, 2)
         }
+
+    def calcular_reynolds(self, velocidade_v, diametro_d, viscosidade_nu=1.01e-6):
+        if viscosidade_nu <= 0: return 0.0
+        return (velocidade_v * diametro_d) / viscosidade_nu
+
+    def calcular_fator_atrito_f(self, reynolds_r):
+        return self.calcular_fator_atrito_p66(reynolds_r)
+
+    def simular_lateral_trecho_a_trecho(self, pressao_p0, vazao_q0, diametro_d, espacamento_se, declividade_so, h_var_max):
+        # Mock implementation
+        return 100.0, [{'L': 0.0, 'pressao': pressao_p0, 'vazao': vazao_q0}]

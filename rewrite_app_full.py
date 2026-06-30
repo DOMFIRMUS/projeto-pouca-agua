@@ -1,4 +1,6 @@
-# -*- coding: utf-8 -*-
+import os
+
+app_content = """# -*- coding: utf-8 -*-
 import math
 import os
 import json
@@ -155,15 +157,9 @@ def gerenciar_bancos():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+"""
 
-@app.route('/api/projetos/<string:codigo_projeto>/linha-lateral-trecho', methods=['POST'])
-def linha_lateral_trecho_endpoint(codigo_projeto):
-    return jsonify({'status': 'ok', 'codigo_projeto': codigo_projeto}), 200
+with open("backend/app.py", "w") as f:
+    f.write(app_content)
 
-@app.route('/api/culturas', methods=['GET'])
-def get_culturas_endpoint():
-    return jsonify({'culturas': []}), 200
-
-@app.route('/api/historico', methods=['GET'])
-def get_historico_endpoint():
-    return jsonify({'historico': []}), 200
+print("Rewritten backend/app.py fully.")

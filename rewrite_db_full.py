@@ -1,4 +1,6 @@
-# -*- coding: utf-8 -*-
+import os
+
+db_content = """# -*- coding: utf-8 -*-
 import sqlite3
 
 def get_db_connection():
@@ -256,17 +258,9 @@ def salvar_projeto_hidraulica_lateral(codigo_projeto, pressao_h, h_var_fraction,
 
 def obter_resumo_hidraulico(codigo_projeto):
     return None
+"""
 
-def salvar_projeto_metadados_geral(codigo_projeto, nome_projeto, nome_propriedade, nome_proprietario, nome_projetista, codigo_subunidade, area_total_irrigada, area_subunidade, data_elaboracao):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO projetos_metadados (codigo_projeto, nome_projeto) VALUES (?, ?)
-        ''', (codigo_projeto, nome_projeto))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception:
-        return False
+with open("backend/database.py", "w") as f:
+    f.write(db_content)
 
+print("Rewritten backend/database.py fully.")
