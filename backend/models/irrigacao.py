@@ -750,17 +750,30 @@ class CalculadorIrrigacao:
         comprimento_total = 0.0
         i = 1
 
+        import math
         area = math.pi * (diametro_m ** 2) / 4.0
 
-        while True:
-            vazao_acumulada_m3s = i * vazao_emissor_m3s
-            v = vazao_acumulada_m3s / area
-            f = self.resolver_fator_atrito_f(v, diametro_m)
+        # Otimização: Pré-computar constantes fora do loop
+        v_unit = vazao_emissor_m3s / area
+        r_unit = (v_unit * diametro_m) / 1.01e-6
+        hf_unit = 8.263e-2 * (vazao_emissor_m3s ** 2 / diametro_m ** 5) * espacamento_m
+        desnivel = declividade * espacamento_m
 
-            hf = 8.263e-2 * f * (vazao_acumulada_m3s ** 2 / diametro_m ** 5) * espacamento_m
+        while True:
+            # Inline do cálculo do número de Reynolds e fator de atrito
+            r = i * r_unit
+
+            if r < 2000:
+                f = 64.0 / r if r > 0 else 0.0
+            elif 2000 <= r < 3000:
+                f = 0.04
+            else:
+                f = 0.316 / (r ** 0.25)
+
+            hf = f * (i ** 2) * hf_unit
 
             # Pressão no emissor atual = pressão do emissor anterior + perda de carga + desnível
-            pressao_atual = pressao_anterior + hf + (declividade * espacamento_m)
+            pressao_atual = pressao_anterior + hf + desnivel
 
             if abs(pressao_atual - pressao_ultimo_emissor) > hvar_max:
                 break
