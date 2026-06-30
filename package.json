@@ -1,0 +1,25 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "description": "O **Projeto Pouca Água** é uma plataforma digital desenvolvida para apoiar o agricultor familiar no manejo eficiente da irrigação. Através de uma interface otimizada para celulares e integrada a sensores de baixo custo, o sistema ajuda a economizar água, tempo e energia, garantindo a produtividade da lavoura através de dados precisos.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DOMFIRMUS/projeto-pouca-agua.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/DOMFIRMUS/projeto-pouca-agua/issues"
+  },
+  "homepage": "https://github.com/DOMFIRMUS/projeto-pouca-agua#readme",
+  "devDependencies": {
+    "jest": "^30.4.2",
+    "jest-environment-jsdom": "^30.4.1"
+  }
+}
